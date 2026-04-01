@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch } from '@/stores';
-import { addToCart, syncCartWithServer } from '@/stores/cart-store';
+import { addCartItem } from '@/stores/cart-store';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import type { Product, ProductUnit } from '@/types/product';
@@ -47,16 +47,12 @@ export default function QuickViewModal({
   const handleAdd = () => {
     if (!selectedUnit) return;
     dispatch(
-      addToCart({
+      addCartItem({
         productId: product.id,
         unitId: selectedUnit.unit_id,
         quantity,
       }),
     );
-    setTimeout(() => {
-      const items = JSON.parse(localStorage.getItem('pharmify_cart') || '[]');
-      dispatch(syncCartWithServer(items));
-    }, 100);
     setShowToast(true);
     setTimeout(() => {
       setShowToast(false);

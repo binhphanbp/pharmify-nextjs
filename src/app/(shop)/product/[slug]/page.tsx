@@ -6,7 +6,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { createClient } from '@/lib/supabase/client';
 import { useAppDispatch } from '@/stores';
-import { addToCart, syncCartWithServer } from '@/stores/cart-store';
+import { addCartItem } from '@/stores/cart-store';
 import { formatCurrency } from '@/lib/utils';
 import ProductCard from '@/components/shop/ProductCard';
 import QuickViewModal from '@/components/shop/QuickViewModal';
@@ -118,16 +118,12 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     if (!product || !selectedUnitId) return;
     dispatch(
-      addToCart({
+      addCartItem({
         productId: product.id,
         unitId: selectedUnitId,
         quantity,
       }),
     );
-    setTimeout(() => {
-      const items = JSON.parse(localStorage.getItem('pharmify_cart') || '[]');
-      dispatch(syncCartWithServer(items));
-    }, 100);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
   };

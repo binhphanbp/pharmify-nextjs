@@ -4,9 +4,9 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useAppSelector, useAppDispatch } from '@/stores';
 import {
-  updateQuantity,
-  removeFromCart,
-  clearCart,
+  updateCartQty,
+  removeCartItem,
+  clearAllCart,
   syncCartWithServer,
 } from '@/stores/cart-store';
 import { formatCurrency } from '@/lib/utils';
@@ -22,28 +22,16 @@ export default function CartPage() {
   }, []);
 
   const handleUpdateQty = (productId: string, unitId: string, qty: number) => {
-    dispatch(updateQuantity({ productId, unitId, quantity: qty }));
-    const updatedItems = items
-      .map((i) =>
-        i.product_id === productId && i.unit_id === unitId
-          ? { ...i, quantity: qty }
-          : i,
-      )
-      .filter((i) => i.quantity > 0);
-    dispatch(syncCartWithServer(updatedItems));
+    dispatch(updateCartQty({ productId, unitId, quantity: qty }));
   };
 
   const handleRemove = (productId: string, unitId: string) => {
-    dispatch(removeFromCart({ productId, unitId }));
-    const updatedItems = items.filter(
-      (i) => !(i.product_id === productId && i.unit_id === unitId),
-    );
-    dispatch(syncCartWithServer(updatedItems));
+    dispatch(removeCartItem({ productId, unitId }));
   };
 
   const handleClear = () => {
     if (confirm('Bạn có chắc muốn xóa tất cả sản phẩm trong giỏ hàng?')) {
-      dispatch(clearCart());
+      dispatch(clearAllCart());
     }
   };
 
@@ -87,7 +75,8 @@ export default function CartPage() {
         </h1>
         <button
           onClick={handleClear}
-          className="text-sm text-danger hover:underline flex items-center gap-1"
+          disabled={loading}
+          className="text-sm text-danger hover:underline flex items-center gap-1 disabled:opacity-50"
         >
           <span className="material-icons text-lg">delete_sweep</span>
           Xóa tất cả
@@ -160,7 +149,8 @@ export default function CartPage() {
                         item.quantity - 1,
                       )
                     }
-                    className="w-9 h-9 flex items-center justify-center text-text-secondary hover:bg-bg-primary transition"
+                    disabled={loading}
+                    className="w-9 h-9 flex items-center justify-center text-text-secondary hover:bg-bg-primary transition disabled:opacity-50"
                   >
                     <span className="material-icons text-lg">remove</span>
                   </button>
@@ -175,7 +165,8 @@ export default function CartPage() {
                         item.quantity + 1,
                       )
                     }
-                    className="w-9 h-9 flex items-center justify-center text-text-secondary hover:bg-bg-primary transition"
+                    disabled={loading}
+                    className="w-9 h-9 flex items-center justify-center text-text-secondary hover:bg-bg-primary transition disabled:opacity-50"
                   >
                     <span className="material-icons text-lg">add</span>
                   </button>
@@ -191,7 +182,8 @@ export default function CartPage() {
                 {/* Remove */}
                 <button
                   onClick={() => handleRemove(item.product_id, item.unit_id)}
-                  className="shrink-0 p-2 text-text-muted hover:text-danger transition rounded-lg hover:bg-red-50"
+                  disabled={loading}
+                  className="shrink-0 p-2 text-text-muted hover:text-danger transition rounded-lg hover:bg-red-50 disabled:opacity-50"
                 >
                   <span className="material-icons text-xl">close</span>
                 </button>

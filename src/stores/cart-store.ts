@@ -182,4 +182,50 @@ export const {
   updateQuantity,
   clearCart,
 } = cartSlice.actions;
+
+// Async wrappers to ensure server sync always uses the latest state
+export const addCartItem = createAsyncThunk(
+  'cart/addAndSync',
+  async (
+    payload: { productId: string; unitId: string; quantity?: number },
+    { dispatch, getState },
+  ) => {
+    dispatch(addToCart(payload));
+    const items = (getState() as { cart: CartState }).cart.items;
+    await dispatch(syncCartWithServer(items));
+  },
+);
+
+export const updateCartQty = createAsyncThunk(
+  'cart/updateQtyAndSync',
+  async (
+    payload: { productId: string; unitId: string; quantity: number },
+    { dispatch, getState },
+  ) => {
+    dispatch(updateQuantity(payload));
+    const items = (getState() as { cart: CartState }).cart.items;
+    await dispatch(syncCartWithServer(items));
+  },
+);
+
+export const removeCartItem = createAsyncThunk(
+  'cart/removeAndSync',
+  async (
+    payload: { productId: string; unitId: string },
+    { dispatch, getState },
+  ) => {
+    dispatch(removeFromCart(payload));
+    const items = (getState() as { cart: CartState }).cart.items;
+    await dispatch(syncCartWithServer(items));
+  },
+);
+
+export const clearAllCart = createAsyncThunk(
+  'cart/clearAllAndSync',
+  async (_, { dispatch }) => {
+    dispatch(clearCart());
+    await dispatch(syncCartWithServer([]));
+  },
+);
+
 export default cartSlice.reducer;
