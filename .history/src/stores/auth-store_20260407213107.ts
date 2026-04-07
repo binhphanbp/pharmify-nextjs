@@ -171,9 +171,6 @@ const authSlice = createSlice({
       .addCase(signOut.fulfilled, (state) => {
         state.user = null;
         state.role = null;
-      })
-      .addCase(updateProfile.fulfilled, (state, action) => {
-        if (action.payload) state.user = action.payload;
       });
   },
 });

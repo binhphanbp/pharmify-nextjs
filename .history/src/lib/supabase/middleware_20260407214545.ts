@@ -33,7 +33,7 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { verifyJWT, extractTokenFromCookies } from '@/lib/jwt';
+import { verifyJWT, extractTokenFromCookies, decodeJWT } from '@/lib/jwt';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

@@ -58,18 +58,17 @@ function getFieldClass(
   name: string,
   errors: FormikErrors<Record<string, string>>,
   touched: FormikTouched<Record<string, string>>,
-  extra = '',
 ): string {
   const base =
     'w-full border rounded-lg px-3 py-2.5 mt-1 text-sm transition-all duration-200 outline-none';
 
   if (touched[name] && errors[name]) {
-    return `${base} border-danger bg-red-50/50 focus:border-danger focus:ring-2 focus:ring-danger/20 ${extra}`.trim();
+    // Error
+    return `${base} border-danger bg-red-50/50 focus:border-danger focus:ring-2 focus:ring-danger/20`;
   }
-  if (touched[name] && !errors[name]) {
-    return `${base} border-success bg-green-50/30 focus:border-success focus:ring-2 focus:ring-success/20 ${extra}`.trim();
-  }
-  return `${base} border-border focus:border-primary focus:ring-2 focus:ring-primary/20 ${extra}`.trim();
+
+  // Default
+  return `${base} border-border focus:border-primary focus:ring-2 focus:ring-primary/20`;
 }
 
 // ─── HELPER ────────────────────────────
@@ -82,17 +81,11 @@ function FieldStatus({
   errors: FormikErrors<Record<string, string>>;
   touched: FormikTouched<Record<string, string>>;
 }) {
+  // Show icon when error
   if (touched[name] && errors[name]) {
     return (
       <span className="material-icons text-danger text-base absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none">
         error_outline
-      </span>
-    );
-  }
-  if (touched[name] && !errors[name]) {
-    return (
-      <span className="material-icons text-success text-base absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 pointer-events-none">
-        check_circle
       </span>
     );
   }
@@ -120,9 +113,6 @@ export default function AuthModal({ onClose, redirectTo, standalone }: AuthModal
   const [tab, setTab] = useState<Tab>('login');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showLoginPass, setShowLoginPass] = useState(false);
-  const [showRegPass, setShowRegPass] = useState(false);
-  const [showRegConfirmPass, setShowRegConfirmPass] = useState(false);
 
   const inner = (
     <>
@@ -254,25 +244,21 @@ export default function AuthModal({ onClose, redirectTo, standalone }: AuthModal
                     <div className="relative">
                       <Field
                         name="password"
-                        type={showLoginPass ? 'text' : 'password'}
+                        type="password"
                         placeholder="••••••"
                         className={getFieldClass(
                           'password',
                           errors as FormikErrors<Record<string, string>>,
                           touched as FormikTouched<Record<string, string>>,
-                          'pr-10',
                         )}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginPass(!showLoginPass)}
-                        className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                        tabIndex={-1}
-                      >
-                        <span className="material-icons text-[18px]">
-                          {showLoginPass ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
+                      <FieldStatus
+                        name="password"
+                        errors={errors as FormikErrors<Record<string, string>>}
+                        touched={
+                          touched as FormikTouched<Record<string, string>>
+                        }
+                      />
                     </div>
                     <FieldError name="password" />
                   </div>
@@ -397,25 +383,21 @@ export default function AuthModal({ onClose, redirectTo, standalone }: AuthModal
                     <div className="relative">
                       <Field
                         name="password"
-                        type={showRegPass ? 'text' : 'password'}
+                        type="password"
                         placeholder="Tối thiểu 6 ký tự"
                         className={getFieldClass(
                           'password',
                           errors as FormikErrors<Record<string, string>>,
                           touched as FormikTouched<Record<string, string>>,
-                          'pr-10',
                         )}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPass(!showRegPass)}
-                        className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                        tabIndex={-1}
-                      >
-                        <span className="material-icons text-[18px]">
-                          {showRegPass ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
+                      <FieldStatus
+                        name="password"
+                        errors={errors as FormikErrors<Record<string, string>>}
+                        touched={
+                          touched as FormikTouched<Record<string, string>>
+                        }
+                      />
                     </div>
                     <FieldError name="password" />
                   </div>
@@ -428,25 +410,21 @@ export default function AuthModal({ onClose, redirectTo, standalone }: AuthModal
                     <div className="relative">
                       <Field
                         name="confirmPassword"
-                        type={showRegConfirmPass ? 'text' : 'password'}
+                        type="password"
                         placeholder="Nhập lại mật khẩu"
                         className={getFieldClass(
                           'confirmPassword',
                           errors as FormikErrors<Record<string, string>>,
                           touched as FormikTouched<Record<string, string>>,
-                          'pr-10',
                         )}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegConfirmPass(!showRegConfirmPass)}
-                        className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                        tabIndex={-1}
-                      >
-                        <span className="material-icons text-[18px]">
-                          {showRegConfirmPass ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
+                      <FieldStatus
+                        name="confirmPassword"
+                        errors={errors as FormikErrors<Record<string, string>>}
+                        touched={
+                          touched as FormikTouched<Record<string, string>>
+                        }
+                      />
                     </div>
                     <FieldError name="confirmPassword" />
                   </div>
