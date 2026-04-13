@@ -43,7 +43,7 @@ export const initializeAuth = createAsyncThunk(
         dispatch(setUser({ user: null, role: null }));
         return;
       }
-      // Only re-query is_admin on full sign-in; skip for TOKEN_REFRESHED / USER_UPDATED
+
       if (event === 'SIGNED_IN') {
         let newRole: 'admin' | 'user' = 'user';
         try {
@@ -122,25 +122,36 @@ export const updateProfile = createAsyncThunk(
   ) => {
     try {
       const supabase = createClient();
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError || !user) return rejectWithValue('Chưa đăng nhập');
 
       // Cập nhật user_metadata trong Supabase Auth
-      const { data: updatedAuth, error: authError } = await supabase.auth.updateUser({
-        data: { full_name: fullName, phone, dob, gender },
-      });
+      const { data: updatedAuth, error: authError } =
+        await supabase.auth.updateUser({
+          data: { full_name: fullName, phone, dob, gender },
+        });
       if (authError) return rejectWithValue(authError.message);
 
       // Cập nhật bảng profiles
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ full_name: fullName, phone, dob: dob || null, gender: gender || null })
+        .update({
+          full_name: fullName,
+          phone,
+          dob: dob || null,
+          gender: gender || null,
+        })
         .eq('id', user.id);
       if (profileError) return rejectWithValue(profileError.message);
 
       return updatedAuth.user;
     } catch (e: unknown) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Cập nhật thất bại');
+      return rejectWithValue(
+        e instanceof Error ? e.message : 'Cập nhật thất bại',
+      );
     }
   },
 );

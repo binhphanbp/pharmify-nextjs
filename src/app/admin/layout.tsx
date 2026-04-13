@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppSelector, useAppDispatch } from '@/stores';
 import { signOut } from '@/stores/auth-store';
+import AdminChatBot from '@/components/admin/AdminChatBot';
 
 const navItems = [
   { href: '/admin', icon: 'dashboard', label: 'Dashboard' },
@@ -14,6 +15,7 @@ const navItems = [
   { href: '/admin/brands', icon: 'branding_watermark', label: 'Thương hiệu' },
   { href: '/admin/flash-sale', icon: 'flash_on', label: 'Flash Sale' },
   { href: '/admin/orders', icon: 'receipt_long', label: 'Đơn hàng' },
+  { href: '/admin/users', icon: 'people', label: 'Người dùng' },
 ];
 
 export default function AdminLayout({
@@ -160,6 +162,9 @@ export default function AdminLayout({
           <div className="admin-page">{children}</div>
         </main>
       </div>
+
+      {/* AI Analytics ChatBot */}
+      <AdminChatBot />
     </div>
   );
 }

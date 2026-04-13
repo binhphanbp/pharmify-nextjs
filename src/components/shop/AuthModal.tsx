@@ -114,7 +114,11 @@ function FieldError({ name }: { name: string }) {
 }
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────
-export default function AuthModal({ onClose, redirectTo, standalone }: AuthModalProps) {
+export default function AuthModal({
+  onClose,
+  redirectTo,
+  standalone,
+}: AuthModalProps) {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('login');
@@ -149,398 +153,386 @@ export default function AuthModal({ onClose, redirectTo, standalone }: AuthModal
       )}
 
       <div className={standalone ? '' : 'modal-body'}>
-          {/* Tabs */}
-          {tab !== 'forgot' && (
-            <div className="flex gap-1 bg-bg-primary rounded-lg p-1 mb-6">
-              <button
-                onClick={() => {
-                  setTab('login');
-                  setError('');
-                  setSuccess('');
-                }}
-                className={`flex-1 py-2.5 rounded-md text-sm font-semibold transition ${tab === 'login' ? 'bg-white text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
-              >
-                Đăng nhập
-              </button>
-              <button
-                onClick={() => {
-                  setTab('register');
-                  setError('');
-                  setSuccess('');
-                }}
-                className={`flex-1 py-2.5 rounded-md text-sm font-semibold transition ${tab === 'register' ? 'bg-white text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
-              >
-                Đăng ký
-              </button>
-            </div>
-          )}
-
-          {/* Alert lỗi từ server */}
-          {error && (
-            <div className="bg-red-50 text-danger text-sm p-3 rounded-lg mb-4 flex items-center gap-2">
-              <span className="material-icons text-lg">error</span>
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="bg-green-50 text-success text-sm p-3 rounded-lg mb-4 flex items-center gap-2">
-              <span className="material-icons text-lg">check_circle</span>
-              {success}
-            </div>
-          )}
-
-          {/* ─── LOGIN FORM ─────────────────────────────────────── */}
-          {tab === 'login' && (
-            <Formik
-              initialValues={{ email: '', password: '' }}
-              validationSchema={LoginSchema}
-              validateOnChange={true}
-              validateOnBlur={true}
-              onSubmit={async (values, { setSubmitting }) => {
-                setError('');
-                try {
-                  await dispatch(
-                    signIn({ email: values.email, password: values.password }),
-                  ).unwrap();
-                  if (redirectTo) {
-                    router.push(redirectTo);
-                  } else {
-                    onClose();
-                  }
-                } catch (err: unknown) {
-                  if (err && typeof err === 'object' && 'message' in err) {
-                    setError(String((err as { message: string }).message));
-                  } else {
-                    setError(String(err));
-                  }
-                }
-                setSubmitting(false);
-              }}
-            >
-              {({ isSubmitting, errors, touched }) => (
-                <Form noValidate>
-                  {/* Email */}
-                  <div className="form-group pb-3">
-                    <label className="text-sm font-medium text-text-primary">
-                      Email
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        className={getFieldClass(
-                          'email',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                        )}
-                      />
-                      <FieldStatus
-                        name="email"
-                        errors={errors as FormikErrors<Record<string, string>>}
-                        touched={
-                          touched as FormikTouched<Record<string, string>>
-                        }
-                      />
-                    </div>
-                    <FieldError name="email" />
-                  </div>
-
-                  {/* Password */}
-                  <div className="form-group pb-2">
-                    <label className="text-sm font-medium text-text-primary">
-                      Mật khẩu
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="password"
-                        type={showLoginPass ? 'text' : 'password'}
-                        placeholder="••••••"
-                        className={getFieldClass(
-                          'password',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                          'pr-10',
-                        )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginPass(!showLoginPass)}
-                        className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                        tabIndex={-1}
-                      >
-                        <span className="material-icons text-[18px]">
-                          {showLoginPass ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
-                    </div>
-                    <FieldError name="password" />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setTab('forgot')}
-                    className="text-sm text-primary hover:underline mb-4 block mt-2"
-                  >
-                    Quên mật khẩu?
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="btn-primary w-full justify-center"
-                  >
-                    {isSubmitting ? 'Đang xử lý...' : 'Đăng nhập'}
-                  </button>
-                </Form>
-              )}
-            </Formik>
-          )}
-
-          {/* ─── REGISTER FORM ──────────────────────────────────── */}
-          {tab === 'register' && (
-            <Formik
-              initialValues={{
-                fullName: '',
-                email: '',
-                password: '',
-                confirmPassword: '',
-              }}
-              validationSchema={RegisterSchema}
-              validateOnChange={true}
-              validateOnBlur={true}
-              onSubmit={async (values, { setSubmitting }) => {
+        {/* Tabs */}
+        {tab !== 'forgot' && (
+          <div className="flex gap-1 bg-bg-primary rounded-lg p-1 mb-6">
+            <button
+              onClick={() => {
+                setTab('login');
                 setError('');
                 setSuccess('');
-                try {
-                  await dispatch(
-                    signUp({
-                      email: values.email,
-                      password: values.password,
-                      fullName: values.fullName,
-                    }),
-                  ).unwrap();
-                  setSuccess('Đăng ký thành công! Bạn có thể đăng nhập ngay.');
-                  setTimeout(() => setTab('login'), 1500);
-                } catch (err: unknown) {
-                  // RTK rejectWithValue hoặc Error
-                  if (err && typeof err === 'object' && 'message' in err) {
-                    setError(String((err as { message: string }).message));
-                  } else {
-                    setError(String(err));
-                  }
-                }
-                setSubmitting(false);
               }}
+              className={`flex-1 py-2.5 rounded-md text-sm font-semibold transition ${tab === 'login' ? 'bg-white text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
             >
-              {({ isSubmitting, errors, touched }) => (
-                <Form noValidate>
-                  {/* Họ tên */}
-                  <div className="form-group pb-3">
-                    <label className="text-sm font-medium text-text-primary">
-                      Họ tên
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="fullName"
-                        type="text"
-                        placeholder="Nguyễn Văn A"
-                        className={getFieldClass(
-                          'fullName',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                        )}
-                      />
-                      <FieldStatus
-                        name="fullName"
-                        errors={errors as FormikErrors<Record<string, string>>}
-                        touched={
-                          touched as FormikTouched<Record<string, string>>
-                        }
-                      />
-                    </div>
-                    <FieldError name="fullName" />
-                  </div>
-
-                  {/* Email */}
-                  <div className="form-group pb-3">
-                    <label className="text-sm font-medium text-text-primary">
-                      Email
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        className={getFieldClass(
-                          'email',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                        )}
-                      />
-                      <FieldStatus
-                        name="email"
-                        errors={errors as FormikErrors<Record<string, string>>}
-                        touched={
-                          touched as FormikTouched<Record<string, string>>
-                        }
-                      />
-                    </div>
-                    <FieldError name="email" />
-                  </div>
-
-                  {/* Mật khẩu */}
-                  <div className="form-group pb-3">
-                    <label className="text-sm font-medium text-text-primary">
-                      Mật khẩu
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="password"
-                        type={showRegPass ? 'text' : 'password'}
-                        placeholder="Tối thiểu 6 ký tự"
-                        className={getFieldClass(
-                          'password',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                          'pr-10',
-                        )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPass(!showRegPass)}
-                        className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                        tabIndex={-1}
-                      >
-                        <span className="material-icons text-[18px]">
-                          {showRegPass ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
-                    </div>
-                    <FieldError name="password" />
-                  </div>
-
-                  {/* Xác nhận mật khẩu */}
-                  <div className="form-group pb-3">
-                    <label className="text-sm font-medium text-text-primary">
-                      Xác nhận mật khẩu
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="confirmPassword"
-                        type={showRegConfirmPass ? 'text' : 'password'}
-                        placeholder="Nhập lại mật khẩu"
-                        className={getFieldClass(
-                          'confirmPassword',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                          'pr-10',
-                        )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegConfirmPass(!showRegConfirmPass)}
-                        className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
-                        tabIndex={-1}
-                      >
-                        <span className="material-icons text-[18px]">
-                          {showRegConfirmPass ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
-                    </div>
-                    <FieldError name="confirmPassword" />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="btn-primary w-full justify-center mt-2"
-                  >
-                    {isSubmitting ? 'Đang xử lý...' : 'Đăng ký'}
-                  </button>
-                </Form>
-              )}
-            </Formik>
-          )}
-
-          {/* ─── FORGOT PASSWORD FORM ────────────────────────────── */}
-          {tab === 'forgot' && (
-            <Formik
-              initialValues={{ email: '' }}
-              validationSchema={ForgotSchema}
-              validateOnChange={true}
-              validateOnBlur={true}
-              onSubmit={async (values, { setSubmitting }) => {
+              Đăng nhập
+            </button>
+            <button
+              onClick={() => {
+                setTab('register');
                 setError('');
                 setSuccess('');
-                try {
-                  await dispatch(resetPassword(values.email)).unwrap();
-                  setSuccess('Đã gửi email khôi phục mật khẩu!');
-                } catch (err: unknown) {
-                  setError(err instanceof Error ? err.message : String(err));
-                }
-                setSubmitting(false);
               }}
+              className={`flex-1 py-2.5 rounded-md text-sm font-semibold transition ${tab === 'register' ? 'bg-white text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
             >
-              {({ isSubmitting, errors, touched }) => (
-                <Form noValidate>
-                  <p className="text-sm text-text-secondary mb-4">
-                    Nhập email của bạn để nhận link khôi phục mật khẩu.
-                  </p>
-                  <div className="form-group pb-3">
-                    <label className="text-sm font-medium text-text-primary">
-                      Email
-                    </label>
-                    <div className="relative">
-                      <Field
-                        name="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        className={getFieldClass(
-                          'email',
-                          errors as FormikErrors<Record<string, string>>,
-                          touched as FormikTouched<Record<string, string>>,
-                        )}
-                      />
-                      <FieldStatus
-                        name="email"
-                        errors={errors as FormikErrors<Record<string, string>>}
-                        touched={
-                          touched as FormikTouched<Record<string, string>>
-                        }
-                      />
-                    </div>
-                    <FieldError name="email" />
-                  </div>
+              Đăng ký
+            </button>
+          </div>
+        )}
 
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="btn-primary w-full justify-center mb-3 mt-2"
-                  >
-                    {isSubmitting ? 'Đang gửi...' : 'Gửi email khôi phục'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTab('login')}
-                    className="text-sm text-primary hover:underline w-full text-center"
-                  >
-                    ← Quay lại đăng nhập
-                  </button>
-                </Form>
-              )}
-            </Formik>
-          )}
+        {/* Alert lỗi từ server */}
+        {error && (
+          <div className="bg-red-50 text-danger text-sm p-3 rounded-lg mb-4 flex items-center gap-2">
+            <span className="material-icons text-lg">error</span>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="bg-green-50 text-success text-sm p-3 rounded-lg mb-4 flex items-center gap-2">
+            <span className="material-icons text-lg">check_circle</span>
+            {success}
+          </div>
+        )}
+
+        {/* ─── LOGIN FORM ─────────────────────────────────────── */}
+        {tab === 'login' && (
+          <Formik
+            initialValues={{ email: '', password: '' }}
+            validationSchema={LoginSchema}
+            validateOnChange={true}
+            validateOnBlur={true}
+            onSubmit={async (values, { setSubmitting }) => {
+              setError('');
+              try {
+                await dispatch(
+                  signIn({ email: values.email, password: values.password }),
+                ).unwrap();
+                if (redirectTo) {
+                  router.push(redirectTo);
+                } else {
+                  onClose();
+                }
+              } catch (err: unknown) {
+                if (err && typeof err === 'object' && 'message' in err) {
+                  setError(String((err as { message: string }).message));
+                } else {
+                  setError(String(err));
+                }
+              }
+              setSubmitting(false);
+            }}
+          >
+            {({ isSubmitting, errors, touched }) => (
+              <Form noValidate>
+                {/* Email */}
+                <div className="form-group pb-3">
+                  <label className="text-sm font-medium text-text-primary">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      className={getFieldClass(
+                        'email',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                      )}
+                    />
+                    <FieldStatus
+                      name="email"
+                      errors={errors as FormikErrors<Record<string, string>>}
+                      touched={touched as FormikTouched<Record<string, string>>}
+                    />
+                  </div>
+                  <FieldError name="email" />
+                </div>
+
+                {/* Password */}
+                <div className="form-group pb-2">
+                  <label className="text-sm font-medium text-text-primary">
+                    Mật khẩu
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="password"
+                      type={showLoginPass ? 'text' : 'password'}
+                      placeholder="••••••"
+                      className={getFieldClass(
+                        'password',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                        'pr-10',
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPass(!showLoginPass)}
+                      className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
+                      tabIndex={-1}
+                    >
+                      <span className="material-icons text-[18px]">
+                        {showLoginPass ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                  <FieldError name="password" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setTab('forgot')}
+                  className="text-sm text-primary hover:underline mb-4 block mt-2"
+                >
+                  Quên mật khẩu?
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn-primary w-full justify-center"
+                >
+                  {isSubmitting ? 'Đang xử lý...' : 'Đăng nhập'}
+                </button>
+              </Form>
+            )}
+          </Formik>
+        )}
+
+        {/* ─── REGISTER FORM ──────────────────────────────────── */}
+        {tab === 'register' && (
+          <Formik
+            initialValues={{
+              fullName: '',
+              email: '',
+              password: '',
+              confirmPassword: '',
+            }}
+            validationSchema={RegisterSchema}
+            validateOnChange={true}
+            validateOnBlur={true}
+            onSubmit={async (values, { setSubmitting }) => {
+              setError('');
+              setSuccess('');
+              try {
+                await dispatch(
+                  signUp({
+                    email: values.email,
+                    password: values.password,
+                    fullName: values.fullName,
+                  }),
+                ).unwrap();
+                setSuccess('Đăng ký thành công! Bạn có thể đăng nhập ngay.');
+                setTimeout(() => setTab('login'), 1500);
+              } catch (err: unknown) {
+                // RTK rejectWithValue hoặc Error
+                if (err && typeof err === 'object' && 'message' in err) {
+                  setError(String((err as { message: string }).message));
+                } else {
+                  setError(String(err));
+                }
+              }
+              setSubmitting(false);
+            }}
+          >
+            {({ isSubmitting, errors, touched }) => (
+              <Form noValidate>
+                {/* Họ tên */}
+                <div className="form-group pb-3">
+                  <label className="text-sm font-medium text-text-primary">
+                    Họ tên
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="fullName"
+                      type="text"
+                      placeholder="Nguyễn Văn A"
+                      className={getFieldClass(
+                        'fullName',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                      )}
+                    />
+                    <FieldStatus
+                      name="fullName"
+                      errors={errors as FormikErrors<Record<string, string>>}
+                      touched={touched as FormikTouched<Record<string, string>>}
+                    />
+                  </div>
+                  <FieldError name="fullName" />
+                </div>
+
+                {/* Email */}
+                <div className="form-group pb-3">
+                  <label className="text-sm font-medium text-text-primary">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      className={getFieldClass(
+                        'email',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                      )}
+                    />
+                    <FieldStatus
+                      name="email"
+                      errors={errors as FormikErrors<Record<string, string>>}
+                      touched={touched as FormikTouched<Record<string, string>>}
+                    />
+                  </div>
+                  <FieldError name="email" />
+                </div>
+
+                {/* Mật khẩu */}
+                <div className="form-group pb-3">
+                  <label className="text-sm font-medium text-text-primary">
+                    Mật khẩu
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="password"
+                      type={showRegPass ? 'text' : 'password'}
+                      placeholder="Tối thiểu 6 ký tự"
+                      className={getFieldClass(
+                        'password',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                        'pr-10',
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPass(!showRegPass)}
+                      className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
+                      tabIndex={-1}
+                    >
+                      <span className="material-icons text-[18px]">
+                        {showRegPass ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                  <FieldError name="password" />
+                </div>
+
+                {/* Xác nhận mật khẩu */}
+                <div className="form-group pb-3">
+                  <label className="text-sm font-medium text-text-primary">
+                    Xác nhận mật khẩu
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="confirmPassword"
+                      type={showRegConfirmPass ? 'text' : 'password'}
+                      placeholder="Nhập lại mật khẩu"
+                      className={getFieldClass(
+                        'confirmPassword',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                        'pr-10',
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegConfirmPass(!showRegConfirmPass)}
+                      className="absolute right-3 top-[calc(50%+2px)] -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
+                      tabIndex={-1}
+                    >
+                      <span className="material-icons text-[18px]">
+                        {showRegConfirmPass ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                  <FieldError name="confirmPassword" />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn-primary w-full justify-center mt-2"
+                >
+                  {isSubmitting ? 'Đang xử lý...' : 'Đăng ký'}
+                </button>
+              </Form>
+            )}
+          </Formik>
+        )}
+
+        {/* ─── FORGOT PASSWORD FORM ────────────────────────────── */}
+        {tab === 'forgot' && (
+          <Formik
+            initialValues={{ email: '' }}
+            validationSchema={ForgotSchema}
+            validateOnChange={true}
+            validateOnBlur={true}
+            onSubmit={async (values, { setSubmitting }) => {
+              setError('');
+              setSuccess('');
+              try {
+                await dispatch(resetPassword(values.email)).unwrap();
+                setSuccess('Đã gửi email khôi phục mật khẩu!');
+              } catch (err: unknown) {
+                setError(err instanceof Error ? err.message : String(err));
+              }
+              setSubmitting(false);
+            }}
+          >
+            {({ isSubmitting, errors, touched }) => (
+              <Form noValidate>
+                <p className="text-sm text-text-secondary mb-4">
+                  Nhập email của bạn để nhận link khôi phục mật khẩu.
+                </p>
+                <div className="form-group pb-3">
+                  <label className="text-sm font-medium text-text-primary">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Field
+                      name="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      className={getFieldClass(
+                        'email',
+                        errors as FormikErrors<Record<string, string>>,
+                        touched as FormikTouched<Record<string, string>>,
+                      )}
+                    />
+                    <FieldStatus
+                      name="email"
+                      errors={errors as FormikErrors<Record<string, string>>}
+                      touched={touched as FormikTouched<Record<string, string>>}
+                    />
+                  </div>
+                  <FieldError name="email" />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn-primary w-full justify-center mb-3 mt-2"
+                >
+                  {isSubmitting ? 'Đang gửi...' : 'Gửi email khôi phục'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('login')}
+                  className="text-sm text-primary hover:underline w-full text-center"
+                >
+                  ← Quay lại đăng nhập
+                </button>
+              </Form>
+            )}
+          </Formik>
+        )}
       </div>
     </>
   );
 
   if (standalone) {
-    return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        {inner}
-      </div>
-    );
+    return <div className="bg-white rounded-2xl p-6 shadow-sm">{inner}</div>;
   }
 
   return (
@@ -548,9 +540,7 @@ export default function AuthModal({ onClose, redirectTo, standalone }: AuthModal
       className="modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal max-w-md">
-        {inner}
-      </div>
+      <div className="modal max-w-md">{inner}</div>
     </div>
   );
 }

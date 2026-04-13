@@ -19,8 +19,8 @@ export default function CartPage() {
     if (items.length > 0) {
       dispatch(syncCartWithServer(items));
     }
-  // Re-run whenever the cart item count changes (e.g. after initCart loads from localStorage)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Re-run whenever the cart item count changes (e.g. after initCart loads from localStorage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
   const handleUpdateQty = (productId: string, unitId: string, qty: number) => {

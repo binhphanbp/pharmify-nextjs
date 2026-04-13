@@ -1,14 +1,6 @@
 /**
  * API Route: GET /api/auth/token-info
- *
- * Demo endpoint cho thầy thấy JWT đang được dùng và verify thủ công.
- *
- * Tương đương Express.js:
- * ──────────────────────────────────────────────────
- *   app.get('/api/auth/token-info', authMiddleware, (req, res) => {
- *     res.json({ user: req.user, token: req.headers.authorization });
- *   });
- * ──────────────────────────────────────────────────
+ *──────────────────────────────────────────────────
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,15 +16,13 @@ export async function GET(request: NextRequest) {
       {
         authenticated: false,
         message: 'No JWT token found. Please login first.',
-        // Hướng dẫn: trong Express, token nằm ở Authorization header
-        // Trong Next.js/Supabase, token nằm trong cookie
+
         hint: 'Token is stored in HTTP-only cookie by Supabase',
       },
       { status: 401 },
     );
   }
 
-  // ⭐ Tự verify JWT — giống jwt.verify() trong Express
   const payload = await verifyJWT(token);
 
   if (!payload) {
@@ -48,15 +38,14 @@ export async function GET(request: NextRequest) {
   // Decode để lấy full payload (không verify lại)
   const rawPayload = decodeJWT(token) as Record<string, unknown> | null;
 
-  // Trả về thông tin JWT đã decode
   return NextResponse.json({
     authenticated: true,
     message: '✅ JWT verified successfully (manual verification using jose)',
 
     // Thông tin token
     token_info: {
-      raw_token: token, // JWT gốc (header.payload.signature)
-      algorithm: 'HS256', // Supabase dùng HMAC SHA-256
+      raw_token: token,
+      algorithm: 'HS256',
       token_type: 'Bearer',
     },
 
@@ -71,15 +60,13 @@ export async function GET(request: NextRequest) {
       audience: payload.aud,
     },
 
-    // Metadata đầy đủ từ Supabase
     raw_decoded_payload: rawPayload,
 
-    // So sánh với Express.js
     comparison_with_express: {
-      express: "jwt.verify(token, process.env.JWT_SECRET)",
-      nextjs: "await verifyJWT(token) // using jose library",
-      token_location_express: "Authorization: Bearer <token> (HTTP Header)",
-      token_location_nextjs: "sb-<project>-auth-token (HTTP Cookie)",
+      express: 'jwt.verify(token, process.env.JWT_SECRET)',
+      nextjs: 'await verifyJWT(token) // using jose library',
+      token_location_express: 'Authorization: Bearer <token> (HTTP Header)',
+      token_location_nextjs: 'sb-<project>-auth-token (HTTP Cookie)',
     },
   });
 }

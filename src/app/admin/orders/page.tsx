@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { PageHeader, AdminModal, Toast } from '@/components/admin';
 
 interface OrderRow {
   id: string;
@@ -64,14 +65,6 @@ export default function AdminOrdersPage() {
     type: 'success' | 'error';
   } | null>(null);
 
-  const showToast = (
-    message: string,
-    type: 'success' | 'error' = 'success',
-  ) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const supabase = createClient();
 
   useEffect(() => {
@@ -89,21 +82,15 @@ export default function AdminOrdersPage() {
   };
 
   const updateStatus = async (orderId: string, newStatus: string) => {
-    if (
-      !confirm(
-        `Chuyển trạng thái thành "${STATUS_OPTIONS.find((s) => s.value === newStatus)?.label}"?`,
-      )
-    )
-      return;
     const { error } = await supabase.rpc('fn_update_order_status', {
       p_order_id: orderId,
       p_new_status: newStatus,
     });
     if (error) {
-      showToast('Lỗi: ' + error.message, 'error');
+      setToast({ message: 'Lỗi: ' + error.message, type: 'error' });
       return;
     }
-    showToast('Cập nhật trạng thái thành công!');
+    setToast({ message: 'Cập nhật trạng thái thành công!', type: 'success' });
     loadOrders();
     if (detailOrder?.id === orderId) {
       setDetailOrder({ ...detailOrder, status: newStatus });
@@ -150,9 +137,7 @@ export default function AdminOrdersPage() {
 
   return (
     <>
-      <div className="page-header">
-        <h2 className="text-xl font-bold">Quản lý đơn hàng</h2>
-      </div>
+      <PageHeader title="Quản lý đơn hàng" />
 
       <div className="filter-bar">
         <input
@@ -249,146 +234,133 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Detail Modal */}
-      {detailOrder && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && setDetailOrder(null)}
-        >
-          <div className="modal modal-wide">
-            <div className="modal-header">
-              <h3>
-                Chi tiết đơn hàng #
-                {detailOrder.order_number || detailOrder.id.slice(0, 8)}
-              </h3>
-              <button
-                className="btn-close"
-                onClick={() => setDetailOrder(null)}
-              >
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-            <div className="modal-body">
-              {/* Order info */}
-              <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-                <div>
-                  <p className="text-text-secondary mb-1">Khách hàng</p>
-                  <p className="font-medium">{detailOrder.customer_name}</p>
-                </div>
-                <div>
-                  <p className="text-text-secondary mb-1">Số điện thoại</p>
-                  <p className="font-medium">{detailOrder.customer_phone}</p>
-                </div>
+      <AdminModal
+        show={!!detailOrder}
+        onClose={() => setDetailOrder(null)}
+        title={`Chi tiết đơn hàng #${detailOrder?.order_number || detailOrder?.id.slice(0, 8) || ''}`}
+        wide
+      >
+        {detailOrder && (
+          <>
+            {/* Order info */}
+            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+              <div>
+                <p className="text-text-secondary mb-1">Khách hàng</p>
+                <p className="font-medium">{detailOrder.customer_name}</p>
+              </div>
+              <div>
+                <p className="text-text-secondary mb-1">Số điện thoại</p>
+                <p className="font-medium">{detailOrder.customer_phone}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-text-secondary mb-1">Địa chỉ</p>
+                <p className="font-medium">{detailOrder.shipping_address}</p>
+              </div>
+              {detailOrder.notes && (
                 <div className="col-span-2">
-                  <p className="text-text-secondary mb-1">Địa chỉ</p>
-                  <p className="font-medium">{detailOrder.shipping_address}</p>
+                  <p className="text-text-secondary mb-1">Ghi chú</p>
+                  <p className="text-sm">{detailOrder.notes}</p>
                 </div>
-                {detailOrder.notes && (
-                  <div className="col-span-2">
-                    <p className="text-text-secondary mb-1">Ghi chú</p>
-                    <p className="text-sm">{detailOrder.notes}</p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-text-secondary mb-1">Trạng thái</p>
-                  <span className={getStatusBadge(detailOrder.status)}>
-                    {
-                      STATUS_OPTIONS.find((s) => s.value === detailOrder.status)
-                        ?.label
-                    }
-                  </span>
-                </div>
-                <div>
-                  <p className="text-text-secondary mb-1">Ngày đặt</p>
-                  <p className="font-medium">
-                    {formatDate(detailOrder.created_at, 'long')}
-                  </p>
-                </div>
-              </div>
-
-              {/* Order items */}
-              <h4 className="font-bold text-sm mb-3">Sản phẩm</h4>
-              {loadingItems ? (
-                <p className="text-text-muted text-sm">Đang tải...</p>
-              ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Sản phẩm</th>
-                      <th>Đơn vị</th>
-                      <th>SL</th>
-                      <th>Đơn giá</th>
-                      <th>Thành tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orderItems.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={
-                                item.product_image ||
-                                'https://placehold.co/32x32/f5f5f5/999?text=?'
-                              }
-                              className="thumb w-8 h-8"
-                              alt=""
-                            />
-                            <span className="text-sm">{item.product_name}</span>
-                          </div>
-                        </td>
-                        <td className="text-sm">{item.unit_name}</td>
-                        <td className="text-sm">{item.quantity}</td>
-                        <td className="text-sm">
-                          {formatCurrency(item.price)}
-                        </td>
-                        <td className="text-sm font-semibold">
-                          {formatCurrency(item.line_total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={4} className="text-right font-bold text-sm">
-                        Tổng cộng:
-                      </td>
-                      <td className="font-bold text-accent text-sm">
-                        {formatCurrency(detailOrder.total_amount)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
               )}
-
-              {/* Status change */}
-              <div className="mt-6 pt-4 border-t border-border">
-                <h4 className="font-bold text-sm mb-3">Cập nhật trạng thái</h4>
-                <div className="flex flex-wrap gap-2">
-                  {STATUS_OPTIONS.map((s) => (
-                    <button
-                      key={s.value}
-                      onClick={() => updateStatus(detailOrder.id, s.value)}
-                      disabled={detailOrder.status === s.value}
-                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition ${detailOrder.status === s.value ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'} ${s.color}`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
+              <div>
+                <p className="text-text-secondary mb-1">Trạng thái</p>
+                <span className={getStatusBadge(detailOrder.status)}>
+                  {
+                    STATUS_OPTIONS.find((s) => s.value === detailOrder.status)
+                      ?.label
+                  }
+                </span>
+              </div>
+              <div>
+                <p className="text-text-secondary mb-1">Ngày đặt</p>
+                <p className="font-medium">
+                  {formatDate(detailOrder.created_at, 'long')}
+                </p>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+
+            {/* Order items */}
+            <h4 className="font-bold text-sm mb-3">Sản phẩm</h4>
+            {loadingItems ? (
+              <p className="text-text-muted text-sm">Đang tải...</p>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Sản phẩm</th>
+                    <th>Đơn vị</th>
+                    <th>SL</th>
+                    <th>Đơn giá</th>
+                    <th>Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={
+                              item.product_image ||
+                              'https://placehold.co/32x32/f5f5f5/999?text=?'
+                            }
+                            className="thumb w-8 h-8"
+                            alt=""
+                          />
+                          <span className="text-sm">{item.product_name}</span>
+                        </div>
+                      </td>
+                      <td className="text-sm">{item.unit_name}</td>
+                      <td className="text-sm">{item.quantity}</td>
+                      <td className="text-sm">
+                        {formatCurrency(item.price)}
+                      </td>
+                      <td className="text-sm font-semibold">
+                        {formatCurrency(item.line_total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={4} className="text-right font-bold text-sm">
+                      Tổng cộng:
+                    </td>
+                    <td className="font-bold text-accent text-sm">
+                      {formatCurrency(detailOrder.total_amount)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+
+            {/* Status change */}
+            <div className="mt-6 pt-4 border-t border-border">
+              <h4 className="font-bold text-sm mb-3">Cập nhật trạng thái</h4>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_OPTIONS.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => updateStatus(detailOrder.id, s.value)}
+                    disabled={detailOrder.status === s.value}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition ${detailOrder.status === s.value ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'} ${s.color}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </AdminModal>
 
       {/* Toast */}
       {toast && (
-        <div className={`toast ${toast.type === 'error' ? 'error' : ''}`}>
-          <span className="material-icons">
-            {toast.type === 'error' ? 'error' : 'check_circle'}
-          </span>
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </>
   );

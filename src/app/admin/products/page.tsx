@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, generateSlug } from '@/lib/utils';
+import {
+  PageHeader,
+  AdminModal,
+  StatusBadge,
+  ConfirmDelete,
+  Toast,
+} from '@/components/admin';
 
 interface ProductRow {
   id: string;
@@ -46,6 +53,8 @@ export default function AdminProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ProductRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Form
   const [form, setForm] = useState({
@@ -65,7 +74,6 @@ export default function AdminProductsPage() {
 
   // Units
   const [showUnitsModal, setShowUnitsModal] = useState(false);
-  const [unitsProductId, setUnitsProductId] = useState('');
   const [units, setUnits] = useState<UnitRow[]>([]);
 
   useEffect(() => {
@@ -131,16 +139,6 @@ export default function AdminProductsPage() {
     setShowModal(true);
   };
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -170,17 +168,19 @@ export default function AdminProductsPage() {
 
     setShowModal(false);
     setSaving(false);
+    setToast(editing ? 'Cập nhật thành công!' : 'Thêm thành công!');
     loadProducts();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bạn có chắc muốn xóa sản phẩm này?')) return;
-    await supabase.from('products').delete().eq('id', id);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    await supabase.from('products').delete().eq('id', deleteId);
+    setDeleteId(null);
+    setToast('Đã xóa sản phẩm!');
     loadProducts();
   };
 
   const openUnits = async (productId: string) => {
-    setUnitsProductId(productId);
     const { data } = await supabase
       .from('product_units')
       .select('*, units(name)')
@@ -201,12 +201,11 @@ export default function AdminProductsPage() {
 
   return (
     <>
-      <div className="page-header">
-        <h2 className="text-xl font-bold">Quản lý sản phẩm</h2>
-        <button onClick={openAdd} className="btn-primary">
-          <span className="material-icons text-lg">add</span>Thêm sản phẩm
-        </button>
-      </div>
+      <PageHeader
+        title="Quản lý sản phẩm"
+        actionText="Thêm sản phẩm"
+        onAction={openAdd}
+      />
 
       <div className="filter-bar">
         <input
@@ -280,11 +279,7 @@ export default function AdminProductsPage() {
                       {formatCurrency(p.price || 0)}
                     </td>
                     <td>
-                      <span
-                        className={`badge ${p.is_active ? 'active' : 'inactive'}`}
-                      >
-                        {p.is_active ? 'Hoạt động' : 'Ẩn'}
-                      </span>
+                      <StatusBadge active={p.is_active} />
                     </td>
                     <td>
                       <div className="actions justify-end">
@@ -302,10 +297,12 @@ export default function AdminProductsPage() {
                           <span className="material-icons text-lg">edit</span>
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id)}
+                          onClick={() => setDeleteId(p.id)}
                           className="btn-icon danger"
                         >
-                          <span className="material-icons text-lg">delete</span>
+                          <span className="material-icons text-lg">
+                            delete
+                          </span>
                         </button>
                       </div>
                     </td>
@@ -318,234 +315,222 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Product Modal */}
-      {showModal && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
-        >
-          <div className="modal modal-wide">
-            <div className="modal-header">
-              <h3>{editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</h3>
-              <button className="btn-close" onClick={() => setShowModal(false)}>
-                <span className="material-icons">close</span>
-              </button>
+      <AdminModal
+        show={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
+        wide
+        footer={
+          <>
+            <button className="btn-cancel" onClick={() => setShowModal(false)}>
+              Hủy
+            </button>
+            <button
+              type="submit"
+              form="product-form"
+              className="btn-primary"
+              disabled={saving}
+            >
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </button>
+          </>
+        }
+      >
+        <form id="product-form" onSubmit={handleSave}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Tên sản phẩm *</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                    slug: generateSlug(e.target.value),
+                  })
+                }
+                required
+              />
             </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Tên sản phẩm *</label>
-                    <input
-                      type="text"
-                      value={form.name}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          name: e.target.value,
-                          slug: generateSlug(e.target.value),
-                        })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>SKU</label>
-                    <input
-                      type="text"
-                      value={form.sku}
-                      onChange={(e) =>
-                        setForm({ ...form, sku: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Slug</label>
-                    <input
-                      type="text"
-                      value={form.slug}
-                      onChange={(e) =>
-                        setForm({ ...form, slug: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Danh mục</label>
-                    <select
-                      value={form.category_id}
-                      onChange={(e) =>
-                        setForm({ ...form, category_id: e.target.value })
-                      }
-                    >
-                      <option value="">Chọn danh mục</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Mô tả ngắn</label>
-                  <textarea
-                    value={form.short_description}
-                    onChange={(e) =>
-                      setForm({ ...form, short_description: e.target.value })
-                    }
-                    rows={2}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Mô tả chi tiết</label>
-                  <textarea
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                    rows={4}
-                  />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Nhà sản xuất</label>
-                    <input
-                      type="text"
-                      value={form.manufacturer}
-                      onChange={(e) =>
-                        setForm({ ...form, manufacturer: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Xuất xứ</label>
-                    <input
-                      type="text"
-                      value={form.origin}
-                      onChange={(e) =>
-                        setForm({ ...form, origin: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Hình ảnh</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  />
-                  {form.image_url && (
-                    <img
-                      src={form.image_url}
-                      className="preview-img"
-                      alt="preview"
-                    />
-                  )}
-                </div>
-                <div className="flex gap-4 mt-2">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.is_active}
-                      onChange={(e) =>
-                        setForm({ ...form, is_active: e.target.checked })
-                      }
-                    />
-                    Hoạt động
-                  </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.requires_prescription}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          requires_prescription: e.target.checked,
-                        })
-                      }
-                    />
-                    Cần kê đơn
-                  </label>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn-cancel"
-                  onClick={() => setShowModal(false)}
-                >
-                  Hủy
-                </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Đang lưu...' : 'Lưu'}
-                </button>
-              </div>
-            </form>
+            <div className="form-group">
+              <label>SKU</label>
+              <input
+                type="text"
+                value={form.sku}
+                onChange={(e) =>
+                  setForm({ ...form, sku: e.target.value })
+                }
+              />
+            </div>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <div className="form-group">
+              <label>Slug</label>
+              <input
+                type="text"
+                value={form.slug}
+                onChange={(e) =>
+                  setForm({ ...form, slug: e.target.value })
+                }
+              />
+            </div>
+            <div className="form-group">
+              <label>Danh mục</label>
+              <select
+                value={form.category_id}
+                onChange={(e) =>
+                  setForm({ ...form, category_id: e.target.value })
+                }
+              >
+                <option value="">Chọn danh mục</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Mô tả ngắn</label>
+            <textarea
+              value={form.short_description}
+              onChange={(e) =>
+                setForm({ ...form, short_description: e.target.value })
+              }
+              rows={2}
+            />
+          </div>
+          <div className="form-group">
+            <label>Mô tả chi tiết</label>
+            <textarea
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              rows={4}
+            />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Nhà sản xuất</label>
+              <input
+                type="text"
+                value={form.manufacturer}
+                onChange={(e) =>
+                  setForm({ ...form, manufacturer: e.target.value })
+                }
+              />
+            </div>
+            <div className="form-group">
+              <label>Xuất xứ</label>
+              <input
+                type="text"
+                value={form.origin}
+                onChange={(e) =>
+                  setForm({ ...form, origin: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Hình ảnh</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+            />
+            {form.image_url && (
+              <img
+                src={form.image_url}
+                className="preview-img"
+                alt="preview"
+              />
+            )}
+          </div>
+          <div className="flex gap-4 mt-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) =>
+                  setForm({ ...form, is_active: e.target.checked })
+                }
+              />
+              Hoạt động
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.requires_prescription}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    requires_prescription: e.target.checked,
+                  })
+                }
+              />
+              Cần kê đơn
+            </label>
+          </div>
+        </form>
+      </AdminModal>
 
       {/* Units Modal */}
-      {showUnitsModal && (
-        <div
-          className="modal-overlay"
-          onClick={(e) =>
-            e.target === e.currentTarget && setShowUnitsModal(false)
-          }
-        >
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Đơn vị sản phẩm</h3>
-              <button
-                className="btn-close"
-                onClick={() => setShowUnitsModal(false)}
-              >
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-            <div className="modal-body">
-              {units.length === 0 ? (
-                <p className="text-text-muted text-sm text-center py-4">
-                  Chưa có đơn vị nào
-                </p>
-              ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Đơn vị</th>
-                      <th>Hệ số</th>
-                      <th>Giá</th>
-                      <th>Giá gốc</th>
-                      <th>Cơ bản</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {units.map((u) => (
-                      <tr key={u.id}>
-                        <td className="text-sm">{u.unit_name}</td>
-                        <td className="text-sm">{u.conversion_factor}</td>
-                        <td className="text-sm font-semibold">
-                          {formatCurrency(u.price)}
-                        </td>
-                        <td className="text-sm text-text-muted">
-                          {formatCurrency(u.original_price)}
-                        </td>
-                        <td>
-                          {u.is_base_unit && (
-                            <span className="badge active">✓</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <AdminModal
+        show={showUnitsModal}
+        onClose={() => setShowUnitsModal(false)}
+        title="Đơn vị sản phẩm"
+      >
+        {units.length === 0 ? (
+          <p className="text-text-muted text-sm text-center py-4">
+            Chưa có đơn vị nào
+          </p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Đơn vị</th>
+                <th>Hệ số</th>
+                <th>Giá</th>
+                <th>Giá gốc</th>
+                <th>Cơ bản</th>
+              </tr>
+            </thead>
+            <tbody>
+              {units.map((u) => (
+                <tr key={u.id}>
+                  <td className="text-sm">{u.unit_name}</td>
+                  <td className="text-sm">{u.conversion_factor}</td>
+                  <td className="text-sm font-semibold">
+                    {formatCurrency(u.price)}
+                  </td>
+                  <td className="text-sm text-text-muted">
+                    {formatCurrency(u.original_price)}
+                  </td>
+                  <td>
+                    {u.is_base_unit && (
+                      <span className="badge active">✓</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </AdminModal>
+
+      {/* Confirm Delete */}
+      <ConfirmDelete
+        show={!!deleteId}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        message="Bạn có chắc muốn xóa sản phẩm này?"
+      />
+
+      {/* Toast */}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
   );
 }

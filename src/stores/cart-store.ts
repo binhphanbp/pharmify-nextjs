@@ -62,7 +62,9 @@ export const syncCartWithServer = createAsyncThunk(
         total_items: raw.total_items ?? 0,
       } as CartSummary;
     } catch (e: unknown) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Không thể tải giỏ hàng');
+      return rejectWithValue(
+        e instanceof Error ? e.message : 'Không thể tải giỏ hàng',
+      );
     }
   },
 );

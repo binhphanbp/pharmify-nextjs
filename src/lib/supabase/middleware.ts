@@ -64,7 +64,9 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Refresh session token nếu sắp hết hạn — lấy luôn user từ đây
-  const { data: { user: sessionUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: sessionUser },
+  } = await supabase.auth.getUser();
 
   // ─────────────────────────────────────────────────────
   // BƯỚC 2: BẢO VỆ ROUTE — dùng sessionUser từ Supabase SSR
@@ -73,7 +75,9 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isProtectedRoute =
-    pathname.startsWith('/checkout') || pathname.startsWith('/admin') || pathname.startsWith('/account');
+    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/account');
 
   if (isProtectedRoute) {
     if (!sessionUser) {

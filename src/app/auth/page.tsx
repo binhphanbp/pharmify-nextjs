@@ -38,16 +38,21 @@ function AuthPageContent() {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="material-icons text-4xl text-primary">local_pharmacy</span>
+            <span className="material-icons text-4xl text-primary">
+              local_pharmacy
+            </span>
             <span className="text-2xl font-bold text-primary">Pharmify</span>
           </div>
           <p className="text-text-secondary text-sm">
             Đăng nhập để mua sắm và theo dõi đơn hàng
           </p>
         </div>
-        <AuthModal onClose={() => router.push(redirect)} redirectTo={redirect} standalone />
+        <AuthModal
+          onClose={() => router.push(redirect)}
+          redirectTo={redirect}
+          standalone
+        />
       </div>
     </div>
   );
 }
-

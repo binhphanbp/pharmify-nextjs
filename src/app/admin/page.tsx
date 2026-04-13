@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { formatCurrency } from '@/lib/utils';
+import { StatusBadge } from '@/components/admin';
 
 interface Stats {
   products: number;
@@ -199,14 +201,10 @@ export default function AdminDashboard() {
                   </div>
                 </td>
                 <td className="text-sm">
-                  {new Intl.NumberFormat('vi-VN').format(p.price)}đ
+                  {formatCurrency(p.price)}
                 </td>
                 <td>
-                  <span
-                    className={`badge ${p.is_active ? 'active' : 'inactive'}`}
-                  >
-                    {p.is_active ? 'Hoạt động' : 'Ẩn'}
-                  </span>
+                  <StatusBadge active={p.is_active} />
                 </td>
                 <td className="text-sm text-text-secondary">
                   {new Date(p.created_at).toLocaleDateString('vi-VN')}

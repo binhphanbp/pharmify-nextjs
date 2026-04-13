@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Banner } from '@/types/banner';
+import {
+  PageHeader,
+  AdminModal,
+  StatusBadge,
+  ConfirmDelete,
+  Toast,
+} from '@/components/admin';
 
 export default function AdminBannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -11,6 +18,8 @@ export default function AdminBannersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Banner | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '',
     subtitle: '',
@@ -98,23 +107,25 @@ export default function AdminBannersPage() {
 
     setShowModal(false);
     setSaving(false);
+    setToast(editing ? 'Cập nhật thành công!' : 'Thêm thành công!');
     loadBanners();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Xóa banner này?')) return;
-    await supabase.from('banners').delete().eq('id', id);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    await supabase.from('banners').delete().eq('id', deleteId);
+    setDeleteId(null);
+    setToast('Đã xóa banner!');
     loadBanners();
   };
 
   return (
     <>
-      <div className="page-header">
-        <h2 className="text-xl font-bold">Quản lý Banner</h2>
-        <button onClick={openAdd} className="btn-primary">
-          <span className="material-icons text-lg">add</span>Thêm banner
-        </button>
-      </div>
+      <PageHeader
+        title="Quản lý Banner"
+        actionText="Thêm banner"
+        onAction={openAdd}
+      />
 
       <div className="tabs">
         <button
@@ -127,7 +138,8 @@ export default function AdminBannersPage() {
           onClick={() => setActiveTab('sub')}
           className={`tab ${activeTab === 'sub' ? 'active' : ''}`}
         >
-          <span className="material-icons text-lg">view_sidebar</span>Sub Banner
+          <span className="material-icons text-lg">view_sidebar</span>Sub
+          Banner
         </button>
       </div>
 
@@ -160,7 +172,7 @@ export default function AdminBannersPage() {
                       Sửa
                     </button>
                     <button
-                      onClick={() => handleDelete(b.id)}
+                      onClick={() => setDeleteId(b.id)}
                       className="bg-white text-danger px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-50 transition"
                     >
                       Xóa
@@ -176,11 +188,7 @@ export default function AdminBannersPage() {
                   <span className="text-xs text-text-muted">
                     Thứ tự: {b.sort_order}
                   </span>
-                  <span
-                    className={`badge ${b.is_active ? 'active' : 'inactive'}`}
-                  >
-                    {b.is_active ? 'Hoạt động' : 'Ẩn'}
-                  </span>
+                  <StatusBadge active={b.is_active} />
                 </div>
               </div>
             </div>
@@ -188,119 +196,123 @@ export default function AdminBannersPage() {
         </div>
       )}
 
-      {showModal && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
-        >
-          <div className="modal">
-            <div className="modal-header">
-              <h3>{editing ? 'Sửa banner' : 'Thêm banner'}</h3>
-              <button className="btn-close" onClick={() => setShowModal(false)}>
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Tiêu đề</label>
-                  <input
-                    type="text"
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm({ ...form, title: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Phụ đề</label>
-                  <input
-                    type="text"
-                    value={form.subtitle}
-                    onChange={(e) =>
-                      setForm({ ...form, subtitle: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Link URL</label>
-                  <input
-                    type="text"
-                    value={form.link_url}
-                    onChange={(e) =>
-                      setForm({ ...form, link_url: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Vị trí</label>
-                    <select
-                      value={form.position}
-                      onChange={(e) =>
-                        setForm({ ...form, position: e.target.value })
-                      }
-                    >
-                      <option value="hero">Hero</option>
-                      <option value="sub">Sub</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Thứ tự</label>
-                    <input
-                      type="number"
-                      value={form.sort_order}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          sort_order: parseInt(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Hình ảnh</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  />
-                  {form.image_url && (
-                    <img
-                      src={form.image_url}
-                      className="preview-img"
-                      alt="preview"
-                    />
-                  )}
-                </div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) =>
-                      setForm({ ...form, is_active: e.target.checked })
-                    }
-                  />{' '}
-                  Hoạt động
-                </label>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn-cancel"
-                  onClick={() => setShowModal(false)}
-                >
-                  Hủy
-                </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Đang lưu...' : 'Lưu'}
-                </button>
-              </div>
-            </form>
+      {/* Add/Edit Modal */}
+      <AdminModal
+        show={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? 'Sửa banner' : 'Thêm banner'}
+        footer={
+          <>
+            <button className="btn-cancel" onClick={() => setShowModal(false)}>
+              Hủy
+            </button>
+            <button
+              type="submit"
+              form="banner-form"
+              className="btn-primary"
+              disabled={saving}
+            >
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </button>
+          </>
+        }
+      >
+        <form id="banner-form" onSubmit={handleSave}>
+          <div className="form-group">
+            <label>Tiêu đề</label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) =>
+                setForm({ ...form, title: e.target.value })
+              }
+            />
           </div>
-        </div>
-      )}
+          <div className="form-group">
+            <label>Phụ đề</label>
+            <input
+              type="text"
+              value={form.subtitle}
+              onChange={(e) =>
+                setForm({ ...form, subtitle: e.target.value })
+              }
+            />
+          </div>
+          <div className="form-group">
+            <label>Link URL</label>
+            <input
+              type="text"
+              value={form.link_url}
+              onChange={(e) =>
+                setForm({ ...form, link_url: e.target.value })
+              }
+            />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Vị trí</label>
+              <select
+                value={form.position}
+                onChange={(e) =>
+                  setForm({ ...form, position: e.target.value })
+                }
+              >
+                <option value="hero">Hero</option>
+                <option value="sub">Sub</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Thứ tự</label>
+              <input
+                type="number"
+                value={form.sort_order}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    sort_order: parseInt(e.target.value) || 0,
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Hình ảnh</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+            />
+            {form.image_url && (
+              <img
+                src={form.image_url}
+                className="preview-img"
+                alt="preview"
+              />
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.is_active}
+              onChange={(e) =>
+                setForm({ ...form, is_active: e.target.checked })
+              }
+            />{' '}
+            Hoạt động
+          </label>
+        </form>
+      </AdminModal>
+
+      {/* Confirm Delete */}
+      <ConfirmDelete
+        show={!!deleteId}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        message="Bạn có chắc muốn xóa banner này?"
+      />
+
+      {/* Toast */}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
   );
 }
