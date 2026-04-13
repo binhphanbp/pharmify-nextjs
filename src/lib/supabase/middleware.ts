@@ -1,5 +1,5 @@
 /**
- * Supabase Middleware — Kết hợp Self JWT Verification + Session Refresh
+ * Supabase Middleware — Kết hợp Session Refresh + Route Protection
  *
  * ═══════════════════════════════════════════════════════════════════════
  * SO SÁNH VỚI EXPRESS.JS
@@ -33,40 +33,54 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { verifyJWT, extractTokenFromCookies } from '@/lib/jwt';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // ─────────────────────────────────────────────────────
+  // BƯỚC 0: Kiểm tra env variables
+  // ─────────────────────────────────────────────────────
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('[Middleware] Missing Supabase env variables');
+    return supabaseResponse;
+  }
+
+  // ─────────────────────────────────────────────────────
   // BƯỚC 1: REFRESH SESSION (giữ cho Supabase hoạt động)
   // Tương tự: dùng passport.js session() trong Express
   // ─────────────────────────────────────────────────────
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
-        },
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options),
+        );
       },
     },
-  );
+  });
 
   // Refresh session token nếu sắp hết hạn — lấy luôn user từ đây
-  const {
-    data: { user: sessionUser },
-  } = await supabase.auth.getUser();
+  // Wrap trong try-catch để không crash middleware nếu Supabase không respond
+  let sessionUser = null;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    sessionUser = user;
+  } catch (err) {
+    console.error('[Middleware] Failed to get user session:', err);
+    // Không crash — tiếp tục xử lý, protected routes sẽ redirect
+  }
 
   // ─────────────────────────────────────────────────────
   // BƯỚC 2: BẢO VỆ ROUTE — dùng sessionUser từ Supabase SSR
@@ -81,36 +95,16 @@ export async function updateSession(request: NextRequest) {
 
   if (isProtectedRoute) {
     if (!sessionUser) {
-      console.log(`[Middleware] No session for: ${pathname}`);
       return redirectToAuth(request, pathname);
     }
-
-    console.log('[Middleware] ✅ Session valid:', {
-      userId: sessionUser.id,
-      email: sessionUser.email,
-    });
 
     // Kiểm tra role admin — dùng app_metadata từ Supabase session
     if (pathname.startsWith('/admin')) {
       const isAdmin = sessionUser.app_metadata?.role === 'admin';
       if (!isAdmin) {
-        console.log(`[Middleware] ⛔ Not admin: ${sessionUser.email}`);
         const url = request.nextUrl.clone();
         url.pathname = '/';
         return NextResponse.redirect(url);
-      }
-    }
-
-    // Demo: manual JWT verify để log payload (không chặn access)
-    const cookieHeader = request.headers.get('cookie');
-    const token = extractTokenFromCookies(cookieHeader);
-    if (token) {
-      const payload = await verifyJWT(token);
-      if (payload) {
-        console.log('[Middleware] JWT payload:', {
-          sub: payload.sub,
-          exp: new Date(payload.exp! * 1000).toISOString(),
-        });
       }
     }
   }

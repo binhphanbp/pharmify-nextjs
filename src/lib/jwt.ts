@@ -6,13 +6,13 @@
  * const jwt = require('jsonwebtoken')  import { jwtVerify } from 'jose'
  * jwt.verify(token, secret)        →   verifyJWT(token)
  * jwt.decode(token)                →   decodeJWT(token)
+ *
+ * ⚠️ File này chạy trong Edge Runtime (Vercel middleware)
+ *    → KHÔNG dùng Buffer, fs, hoặc Node.js API
+ *    → Dùng TextEncoder/atob thay thế
  */
 
 import { jwtVerify, type JWTPayload } from 'jose';
-
-// Supabase JWT secret — lấy từ Supabase Dashboard > Settings > API > JWT Secret
-// Tương tự: process.env.JWT_SECRET trong Express.js
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET!;
 
 export interface JWTUserPayload extends JWTPayload {
   sub: string;          // User ID
@@ -37,8 +37,16 @@ export interface JWTUserPayload extends JWTPayload {
  */
 export async function verifyJWT(token: string): Promise<JWTUserPayload | null> {
   try {
+    // Đọc secret tại thời điểm gọi hàm (KHÔNG phải top-level)
+    // → Đảm bảo env variable đã sẵn sàng trên Vercel
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('[JWT] SUPABASE_JWT_SECRET is not set');
+      return null;
+    }
+
     // jose yêu cầu secret dạng Uint8Array (raw bytes)
-    const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
+    const secret = new TextEncoder().encode(jwtSecret);
 
     const { payload } = await jwtVerify(token, secret, {
       // Tương tự options trong jwt.verify()
@@ -58,16 +66,22 @@ export async function verifyJWT(token: string): Promise<JWTUserPayload | null> {
  * Tương tự jwt.decode() trong Express.js
  *
  * ⚠️ KHÔNG dùng để xác thực, chỉ để debug/đọc thông tin
+ * ⚠️ Dùng atob() thay vì Buffer.from() để tương thích Edge Runtime
  */
 export function decodeJWT(token: string): JWTUserPayload | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
-    // Decode phần payload (phần giữa)
-    const payload = JSON.parse(
-      Buffer.from(parts[1], 'base64url').toString('utf-8')
+    // Decode base64url → base64 → string (Edge-compatible)
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonStr = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
     );
+    const payload = JSON.parse(jsonStr);
     return payload as JWTUserPayload;
   } catch {
     return null;
