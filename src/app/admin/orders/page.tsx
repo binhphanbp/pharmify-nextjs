@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { PageHeader, AdminModal, Toast } from '@/components/admin';
@@ -45,7 +45,7 @@ const STATUS_OPTIONS = [
     color: 'bg-purple-100 text-purple-800',
   },
   {
-    value: 'delivered',
+    value: 'completed',
     label: 'Đã giao',
     color: 'bg-green-100 text-green-800',
   },
@@ -67,11 +67,7 @@ export default function AdminOrdersPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    loadOrders();
-  }, []);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from('orders')
@@ -79,7 +75,11 @@ export default function AdminOrdersPage() {
       .order('created_at', { ascending: false });
     setOrders(data || []);
     setLoading(false);
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     const { error } = await supabase.rpc('fn_update_order_status', {
@@ -105,15 +105,23 @@ export default function AdminOrdersPage() {
       .select('*, products(name, image_url), units(name)')
       .eq('order_id', order.id);
     setOrderItems(
-      (data || []).map((i: any) => ({
-        id: i.id,
-        product_name: i.products?.name || '',
-        product_image: i.products?.image_url || '',
-        unit_name: i.units?.name || '',
-        quantity: i.quantity,
-        price: i.price,
-        line_total: i.price * i.quantity,
-      })),
+      (data || []).map(
+        (i: {
+          id: string;
+          quantity: number;
+          price: number;
+          products?: { name: string; image_url: string };
+          units?: { name: string };
+        }) => ({
+          id: i.id,
+          product_name: i.products?.name || '',
+          product_image: i.products?.image_url || '',
+          unit_name: i.units?.name || '',
+          quantity: i.quantity,
+          price: i.price,
+          line_total: i.price * i.quantity,
+        }),
+      ),
     );
     setLoadingItems(false);
   };
@@ -312,9 +320,7 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="text-sm">{item.unit_name}</td>
                       <td className="text-sm">{item.quantity}</td>
-                      <td className="text-sm">
-                        {formatCurrency(item.price)}
-                      </td>
+                      <td className="text-sm">{formatCurrency(item.price)}</td>
                       <td className="text-sm font-semibold">
                         {formatCurrency(item.line_total)}
                       </td>
