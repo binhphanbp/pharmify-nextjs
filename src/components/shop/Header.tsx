@@ -310,7 +310,7 @@ export default function Header() {
                           Tài khoản
                         </Link>
                         <Link
-                          href="/orders"
+                          href="/account/orders"
                           className="dropdown-item"
                           onClick={() => setShowUserMenu(false)}
                         >
