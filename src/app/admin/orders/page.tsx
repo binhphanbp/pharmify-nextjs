@@ -73,7 +73,28 @@ export default function AdminOrdersPage() {
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
-    setOrders(data || []);
+    // Extract customer_name and customer_phone from shipping_address
+    const parsedOrders = (data || []).map((o: any) => {
+      const parts = o.shipping_address ? o.shipping_address.split(' - ') : [];
+      let customer_name = 'Khách vãng lai';
+      let customer_phone = 'N/A';
+      let real_address = o.shipping_address || 'N/A';
+
+      if (parts.length >= 3) {
+        customer_name = parts[0].trim();
+        customer_phone = parts[1].trim();
+        real_address = parts.slice(2).join(' - ').trim();
+      }
+
+      return {
+        ...o,
+        customer_name,
+        customer_phone,
+        shipping_address: real_address,
+      };
+    });
+
+    setOrders(parsedOrders);
     setLoading(false);
   }, [supabase]);
 
