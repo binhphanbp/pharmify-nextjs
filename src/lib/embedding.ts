@@ -64,7 +64,9 @@ export async function embedProduct(productId: string): Promise<boolean> {
   // Fetch product with all text fields
   const { data: product, error } = await supabase
     .from('v_product_detail')
-    .select('name, short_description, description, manufacturer, category_name, active_ingredient, origin')
+    .select(
+      'name, short_description, description, manufacturer, category_name, active_ingredient, origin',
+    )
     .eq('id', productId)
     .single();
 
@@ -98,7 +100,9 @@ export async function embedAllProducts(
 
   const { data: products, error } = await supabase
     .from('v_product_detail')
-    .select('id, name, short_description, description, manufacturer, category_name, active_ingredient, origin')
+    .select(
+      'id, name, short_description, description, manufacturer, category_name, active_ingredient, origin',
+    )
     .eq('is_active', true);
 
   if (error || !products) {
@@ -132,7 +136,10 @@ export async function embedAllProducts(
           .eq('id', batch[j].id);
 
         if (updateError) {
-          console.error(`Failed to store embedding for ${batch[j].name}:`, updateError);
+          console.error(
+            `Failed to store embedding for ${batch[j].name}:`,
+            updateError,
+          );
           failed++;
         } else {
           success++;
@@ -158,7 +165,7 @@ export async function embedAllProducts(
 export async function semanticSearchProducts(
   query: string,
   matchCount: number = 8,
-  matchThreshold: number = 0.60,
+  matchThreshold: number = 0.6,
 ) {
   const supabase = getSupabaseAdmin();
   const queryEmbedding = await generateEmbedding(query);
@@ -180,8 +187,11 @@ export async function semanticSearchProducts(
 }
 
 // ─── Text search fallback (when vector search fails or OPENAI_API_KEY missing) ─
-export async function textSearchFallback(queryOrSupabase: string | ReturnType<typeof createClient>, queryText?: string) {
-  let supabase: ReturnType<typeof createClient>;
+export async function textSearchFallback(
+  queryOrSupabase: string | any,
+  queryText?: string,
+) {
+  let supabase: any;
   let query: string;
 
   if (typeof queryOrSupabase === 'string') {
@@ -199,7 +209,9 @@ export async function textSearchFallback(queryOrSupabase: string | ReturnType<ty
 
   const { data } = await supabase
     .from('v_product_catalog')
-    .select('id, name, slug, image_url, price, original_price, base_unit_name, base_unit_id, manufacturer, short_description, requires_prescription, category_name')
+    .select(
+      'id, name, slug, image_url, price, original_price, base_unit_name, base_unit_id, manufacturer, short_description, requires_prescription, category_name',
+    )
     .eq('is_active', true)
     .or(conditions)
     .limit(8);

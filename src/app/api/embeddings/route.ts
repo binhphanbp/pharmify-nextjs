@@ -19,9 +19,15 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
     if (authError || !user || user.app_metadata?.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 },
+      );
     }
 
     if (!process.env.OPENAI_API_KEY) {
@@ -49,7 +55,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `Hoàn tất: ${result.success} thành công, ${result.failed} thất bại`,
-        ...result,
+        stats: result,
       });
     }
 

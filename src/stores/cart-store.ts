@@ -81,16 +81,34 @@ export const placeOrder = createAsyncThunk(
     if (orderData.items.length === 0) throw new Error('Giỏ hàng trống');
 
     const supabase = createClient();
+
+    // Transform items to match the exact JSON keys expected by the database RPC
+    const formattedItems = orderData.items.map((item) => ({
+      product_id: item.product_id,
+      product_unit_id: item.unit_id,
+      quantity: item.quantity,
+    }));
+
+    // The database RPC 'fn_place_order' expects: p_items, p_shipping_address, p_notes, p_coupon_code
+    // Since orders table doesn't have customer_name and phone columns, we prepend them to the shipping address.
+    const fullAddress = `${orderData.customer_name} - ${orderData.customer_phone} - ${orderData.shipping_address}`;
+
     const { data, error } = await supabase.rpc('fn_place_order', {
-      p_cart_items: orderData.items,
-      p_customer_name: orderData.customer_name,
-      p_customer_phone: orderData.customer_phone,
-      p_shipping_address: orderData.shipping_address,
-      p_notes: orderData.notes || '',
+      p_items: formattedItems,
+      p_shipping_address: fullAddress,
+      p_notes: orderData.notes || null,
+      p_coupon_code: null,
     });
 
     if (error) throw error;
-    if (data && !data.success) throw new Error(data.error);
+
+    // Depending on what 'fn_place_order' returns, it might return a JSON directly or have a success flag
+    // Currently, fn_place_order returns jsonb_build_object('order_id', ..., 'order_number', ...)
+    // So if data has order_id, it is successful.
+    if (!data || !(data.order_id || data.success)) {
+      throw new Error(data?.error || 'Có lỗi khi tạo đơn hàng trên hệ thống');
+    }
+
     return data;
   },
 );
