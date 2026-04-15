@@ -1,34 +1,5 @@
 /**
- * Supabase Middleware — Kết hợp Session Refresh + Route Protection
- *
- * ═══════════════════════════════════════════════════════════════════════
- * SO SÁNH VỚI EXPRESS.JS
- * ═══════════════════════════════════════════════════════════════════════
- *
- * Express.js (thầy dạy):
- * ─────────────────────
- *   const authMiddleware = (req, res, next) => {
- *     const token = req.headers.authorization?.split(' ')[1];
- *     if (!token) return res.status(401).json({ message: 'No token' });
- *     try {
- *       const decoded = jwt.verify(token, process.env.JWT_SECRET);
- *       req.user = decoded;
- *       next();
- *     } catch (err) {
- *       return res.status(401).json({ message: 'Invalid token' });
- *     }
- *   };
- *   app.use('/admin', authMiddleware);
- *
- * Next.js (file này):
- * ─────────────────────
- *   export async function middleware(request: NextRequest) {
- *     const token = extractTokenFromCookies(...)  // ← thay vì Authorization header
- *     const payload = await verifyJWT(token)       // ← tương đương jwt.verify()
- *     if (!payload) return redirect('/auth')       // ← tương đương res.status(401)
- *     // pass through = next()
- *   }
- * ═══════════════════════════════════════════════════════════════════════
+ * Supabase Middleware — Session Refresh + Route Protection
  */
 
 import { createServerClient } from '@supabase/ssr';
@@ -38,7 +9,7 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // ─────────────────────────────────────────────────────
-  // BƯỚC 0: Kiểm tra env variables
+  // Kiểm tra env variables
   // ─────────────────────────────────────────────────────
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -49,8 +20,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // ─────────────────────────────────────────────────────
-  // BƯỚC 1: REFRESH SESSION (giữ cho Supabase hoạt động)
-  // Tương tự: dùng passport.js session() trong Express
+  // REFRESH SESSION (giữ cho Supabase hoạt động)
   // ─────────────────────────────────────────────────────
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -83,8 +53,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // ─────────────────────────────────────────────────────
-  // BƯỚC 2: BẢO VỆ ROUTE — dùng sessionUser từ Supabase SSR
-  // (SSR client tự xử lý chunked cookies sb-*-auth-token.0/.1/...)
+  // BẢO VỆ ROUTE — dùng sessionUser từ Supabase SSR
   // ─────────────────────────────────────────────────────
 
   const pathname = request.nextUrl.pathname;

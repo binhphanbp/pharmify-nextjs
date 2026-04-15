@@ -273,6 +273,7 @@ export default function ChatBot() {
   const [showPulse, setShowPulse] = useState(true);
   const [cartToast, setCartToast] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Restore session
   useEffect(() => {
@@ -340,6 +341,9 @@ export default function ChatBot() {
     setIsLoading(true);
 
     try {
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const chatHistory = [...messages, userMessage].slice(-10).map((m) => ({
         role: m.role,
         content: m.content,
@@ -349,10 +353,12 @@ export default function ChatBot() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: chatHistory }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
-        throw new Error('Chat API failed');
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Chat API failed');
       }
 
       const reader = response.body?.getReader();
@@ -361,12 +367,16 @@ export default function ChatBot() {
       const decoder = new TextDecoder();
       let accumulated = '';
 
+      let sseBuffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter((l) => l.trim());
+        sseBuffer += decoder.decode(value, { stream: true });
+        const parts = sseBuffer.split('\n');
+        // Keep last part as it may be incomplete
+        sseBuffer = parts.pop() || '';
+        const lines = parts.filter((l) => l.trim());
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -428,19 +438,22 @@ export default function ChatBot() {
         }
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Chat error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra';
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessage.id
             ? {
                 ...m,
-                content: '❌ Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.',
+                content: `❌ ${errorMessage === 'Chat API failed' ? 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.' : errorMessage}`,
               }
             : m
         )
       );
     } finally {
       setIsLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -452,7 +465,9 @@ export default function ChatBot() {
   };
 
   const clearChat = () => {
+    if (abortRef.current) abortRef.current.abort();
     setMessages([]);
+    setIsLoading(false);
     sessionStorage.removeItem('pharmify_chat');
   };
 

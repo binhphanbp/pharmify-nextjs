@@ -160,10 +160,25 @@ export default function AdminProductsPage() {
 
     const payload = { ...form, image_url: imageUrl };
 
+    let productId = editing?.id;
+
     if (editing) {
       await supabase.from('products').update(payload).eq('id', editing.id);
     } else {
-      await supabase.from('products').insert(payload);
+      const { data: inserted } = await supabase.from('products').insert(payload).select('id').single();
+      if (inserted) productId = inserted.id;
+    }
+
+    // Generate embedding for RAG (fire-and-forget, don't block save)
+    if (productId) {
+      fetch('/api/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ action: 'generate-one', productId }),
+      }).catch(() => { /* embedding generation is non-blocking */ });
     }
 
     setShowModal(false);

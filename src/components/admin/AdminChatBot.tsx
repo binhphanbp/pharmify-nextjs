@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import type { ChatMessage } from '@/types/chat';
 
 const QUICK_PROMPTS = [
@@ -81,9 +82,17 @@ export default function AdminChatBot() {
         content: m.content,
       }));
 
+      // Get auth token for admin verification
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch('/api/chat/admin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ messages: allMessages }),
         signal: controller.signal,
       });
@@ -98,13 +107,16 @@ export default function AdminChatBot() {
 
       const decoder = new TextDecoder();
       let fullContent = '';
+      let sseBuffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter((l) => l.trim());
+        sseBuffer += decoder.decode(value, { stream: true });
+        const parts = sseBuffer.split('\n');
+        sseBuffer = parts.pop() || '';
+        const lines = parts.filter((l) => l.trim());
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {

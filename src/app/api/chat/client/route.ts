@@ -1,156 +1,163 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { semanticSearchProducts, textSearchFallback as textFallback } from '@/lib/embedding';
+import type { ChatProduct } from '@/types/chat';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-const SYSTEM_PROMPT = `Bạn là "Dược Sĩ AI Pharmify" — trợ lý dược phẩm ảo chuyên nghiệp của nhà thuốc online Pharmify.
+// Rate limit: simple in-memory tracker (per-IP, resets on deploy)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 30; // requests per window
+const RATE_WINDOW = 60_000; // 1 minute
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT;
+}
+
+// ─── Build system prompt with product context ────────────
+function buildSystemPrompt(products: ChatProduct[]): string {
+  const productContext =
+    products.length > 0
+      ? `\n\n📦 SẢN PHẨM LIÊN QUAN TÌM ĐƯỢC TỪ KHO PHARMIFY (dữ liệu thật):
+${products
+  .map(
+    (p, i) =>
+      `${i + 1}. **${p.name}** — ${new Intl.NumberFormat('vi-VN').format(p.price)}đ/${p.base_unit_name || 'Đơn vị'}${p.manufacturer ? ` | NSX: ${p.manufacturer}` : ''}${p.requires_prescription ? ' | ⚠️ Cần đơn thuốc' : ''}${p.short_description ? ` | ${p.short_description.slice(0, 100)}` : ''}`,
+  )
+  .join('\n')}
+
+📋 HƯỚNG DẪN TƯ VẤN SẢN PHẨM:
+- CHỈ giới thiệu các sản phẩm trong danh sách trên — KHÔNG bịa ra sản phẩm không có
+- Giải thích TẠI SAO sản phẩm đó phù hợp với nhu cầu khách hàng
+- Nêu rõ giá, đơn vị, nhà sản xuất nếu có
+- Đề cập nếu sản phẩm cần đơn thuốc (requires_prescription)
+- Nếu không có sản phẩm phù hợp, nói rõ ràng và tư vấn chung`
+      : `\n\n📦 Không tìm thấy sản phẩm trực tiếp liên quan trong kho. Hãy tư vấn chung và gợi ý khách hàng tìm kiếm trên trang web.`;
+
+  return `Bạn là "Dược Sĩ AI Pharmify" — trợ lý dược phẩm ảo chuyên nghiệp của nhà thuốc online Pharmify.
 
 🎯 VAI TRÒ:
-- Tư vấn thuốc, thực phẩm chức năng, thiết bị y tế
-- Hỗ trợ tìm kiếm sản phẩm phù hợp
+- Tư vấn thuốc, thực phẩm chức năng, thiết bị y tế DỰA TRÊN sản phẩm thật trong kho
+- Hỗ trợ tìm kiếm sản phẩm phù hợp với nhu cầu khách hàng
 - Giải đáp thắc mắc về cách dùng thuốc, liều lượng, tác dụng phụ
 - Tư vấn sức khỏe cơ bản, chế độ dinh dưỡng
 
-📋 NGUYÊN TẮC:
+📋 NGUYÊN TẮC QUAN TRỌNG:
 1. Luôn trả lời bằng tiếng Việt, lịch sự, dễ hiểu
-2. Khi tư vấn thuốc, LUÔN nhắc: "Vui lòng tham khảo ý kiến bác sĩ/dược sĩ trước khi sử dụng thuốc"
-3. KHÔNG được kê đơn thuốc — chỉ cung cấp thông tin tham khảo
-4. Nếu triệu chứng nghiêm trọng, khuyên khách đi khám bác sĩ ngay
-5. Trả lời ngắn gọn, có cấu trúc (dùng emoji phù hợp, bullet points)
-6. Khi khách hỏi về sản phẩm cụ thể, gợi ý tìm trên Pharmify
+2. CHỈ giới thiệu sản phẩm CÓ TRONG DANH SÁCH bên dưới — TUYỆT ĐỐI không bịa sản phẩm
+3. Khi tư vấn thuốc, LUÔN nhắc: "Vui lòng tham khảo ý kiến bác sĩ/dược sĩ trước khi sử dụng"
+4. KHÔNG được kê đơn thuốc — chỉ cung cấp thông tin tham khảo
+5. Nếu triệu chứng nghiêm trọng, khuyên khách đi khám bác sĩ ngay
+6. Trả lời ngắn gọn, có cấu trúc (dùng emoji phù hợp, bullet points)
 7. Nếu câu hỏi không liên quan đến sức khỏe/dược phẩm, nhẹ nhàng hướng lại chủ đề
+8. Nếu danh sách sản phẩm trống, tư vấn kiến thức chung và gợi ý khách tìm kiếm trên web
 
 🏥 THÔNG TIN PHARMIFY:
 - Nhà thuốc trực tuyến uy tín
 - Cung cấp: Thuốc, thực phẩm chức năng, thiết bị y tế, mỹ phẩm chăm sóc
 - Đảm bảo hàng chính hãng, giá tốt
-- Giao hàng nhanh toàn quốc
-
-🔍 GỢI Ý SẢN PHẨM:
-- Khi khách hỏi về triệu chứng, bệnh, hoặc nhu cầu sức khỏe, HÃY đề xuất nhóm từ khóa sản phẩm phù hợp
-- Cuối mỗi câu trả lời tư vấn, thêm CHÍNH XÁC 1 dòng cuối cùng có format:
-  [SEARCH_PRODUCTS: từ_khóa_1, từ_khóa_2, từ_khóa_3]
-- Ví dụ nếu khách hỏi về cảm cúm: [SEARCH_PRODUCTS: paracetamol, cảm cúm, hạ sốt, vitamin C]
-- Ví dụ nếu khách hỏi vitamin cho bà bầu: [SEARCH_PRODUCTS: vitamin bà bầu, sắt, acid folic, DHA, canxi]
-- Ví dụ nếu khách hỏi về đau dạ dày: [SEARCH_PRODUCTS: dạ dày, antacid, omeprazol, gastropulgite]
-- Từ khóa phải liên quan đến sản phẩm dược phẩm thực tế có thể có trong nhà thuốc
-- KHÔNG bao giờ đề cập dòng [SEARCH_PRODUCTS:...] trong nội dung giải thích, đây là lệnh tìm kiếm ẩn
-- Nếu câu hỏi KHÔNG liên quan đến sản phẩm hoặc sức khỏe, KHÔNG thêm dòng này
-- LUÔN thêm dòng này khi câu hỏi có liên quan đến sức khỏe hoặc sản phẩm dù là gián tiếp`;
-
-// Extract search keywords from AI response
-function extractSearchKeywords(text: string): { cleanText: string; keywords: string[] } {
-  const regex = /\[SEARCH_PRODUCTS:\s*(.*?)\]/gi;
-  const match = regex.exec(text);
-
-  if (!match) return { cleanText: text, keywords: [] };
-
-  const cleanText = text.replace(regex, '').trim();
-  const keywords = match[1]
-    .split(',')
-    .map((k) => k.trim())
-    .filter((k) => k.length > 0);
-
-  return { cleanText, keywords };
+- Giao hàng nhanh toàn quốc${productContext}`;
 }
 
-// Search products from Supabase with multi-strategy approach
-async function searchProducts(keywords: string[]) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// ─── Detect if user message needs product search ─────────
+function shouldSearchProducts(messages: { role: string; content: string }[]): boolean {
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+  if (!lastUserMsg) return false;
 
-    const selectFields =
-      'id, name, slug, image_url, price, original_price, base_unit_name, base_unit_id, manufacturer, short_description, requires_prescription, category_name';
+  const text = lastUserMsg.content.toLowerCase();
 
-    // Strategy 1: OR query across name + short_description with all keywords
-    const nameConditions = keywords.map((kw) => `name.ilike.%${kw}%`).join(',');
-    const descConditions = keywords.map((kw) => `short_description.ilike.%${kw}%`).join(',');
-    const allConditions = [nameConditions, descConditions].join(',');
+  // Greeting or very short generic messages — no search needed
+  const greetings = ['xin chào', 'hello', 'hi', 'chào', 'hey', 'cảm ơn', 'thank', 'ok', 'được', 'bye', 'tạm biệt'];
+  if (greetings.some((g) => text.trim() === g)) return false;
 
-    const { data } = await supabase
-      .from('v_product_catalog')
-      .select(selectFields)
-      .eq('is_active', true)
-      .or(allConditions)
-      .limit(8);
+  // Health/product-related keywords — definitely search
+  const healthKeywords = [
+    'thuốc', 'đau', 'sốt', 'ho', 'cảm', 'viêm', 'dị ứng', 'vitamin',
+    'bổ sung', 'canxi', 'sắt', 'omega', 'kháng sinh', 'giảm đau',
+    'tiêu hóa', 'dạ dày', 'mắt', 'da', 'tóc', 'xương', 'khớp',
+    'huyết áp', 'tiểu đường', 'cholesterol', 'miễn dịch', 'giấc ngủ',
+    'mệt mỏi', 'stress', 'trẻ em', 'bà bầu', 'người già', 'sản phẩm',
+    'mua', 'giá', 'tìm', 'gợi ý', 'đề xuất', 'nên dùng', 'nên uống',
+    'chăm sóc', 'mỹ phẩm', 'kem', 'gel', 'dung dịch', 'băng', 'gạc',
+    'nhiệt kế', 'máy đo', 'khẩu trang', 'sát khuẩn', 'paracetamol',
+    'ibuprofen', 'aspirin', 'kẽm', 'DHA', 'probiotic', 'men vi sinh',
+  ];
 
-    if (data && data.length > 0) return data;
-
-    // Strategy 2: Individual keyword search on product name
-    for (const keyword of keywords.slice(0, 4)) {
-      const { data: fallbackData } = await supabase
-        .from('v_product_catalog')
-        .select(selectFields)
-        .eq('is_active', true)
-        .ilike('name', `%${keyword}%`)
-        .limit(8);
-
-      if (fallbackData && fallbackData.length > 0) return fallbackData;
-    }
-
-    // Strategy 3: Search by category name
-    for (const keyword of keywords.slice(0, 3)) {
-      const { data: catData } = await supabase
-        .from('v_product_catalog')
-        .select(selectFields)
-        .eq('is_active', true)
-        .ilike('category_name', `%${keyword}%`)
-        .limit(8);
-
-      if (catData && catData.length > 0) return catData;
-    }
-
-    // Strategy 4: Search by manufacturer
-    for (const keyword of keywords.slice(0, 2)) {
-      const { data: mfgData } = await supabase
-        .from('v_product_catalog')
-        .select(selectFields)
-        .eq('is_active', true)
-        .ilike('manufacturer', `%${keyword}%`)
-        .limit(8);
-
-      if (mfgData && mfgData.length > 0) return mfgData;
-    }
-
-    return [];
-  } catch (error) {
-    console.error('Product search error:', error);
-    return [];
-  }
+  return healthKeywords.some((kw) => text.includes(kw)) || text.length > 15;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { error: 'Bạn đã gửi quá nhiều tin nhắn. Vui lòng đợi 1 phút.' },
+        { status: 429 },
+      );
+    }
+
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey || apiKey === 'gsk_YOUR_KEY_HERE') {
       return NextResponse.json(
         { error: 'GROQ_API_KEY chưa được cấu hình' },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    const { messages } = await request.json();
+    const body = await request.json();
+    const { messages } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
         { error: 'Messages là bắt buộc' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Build messages array with system prompt
+    // Limit message history to prevent abuse
+    const recentMessages = messages.slice(-10).map((msg: { role: string; content: string }) => ({
+      role: msg.role,
+      content: msg.content.slice(0, 2000), // Limit each message length
+    }));
+
+    // ─── RAG Step 1: Semantic search for relevant products ───
+    let products: ChatProduct[] = [];
+    const needsSearch = shouldSearchProducts(recentMessages);
+
+    if (needsSearch) {
+      const lastUserMsg = [...recentMessages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) {
+        try {
+          if (process.env.OPENAI_API_KEY) {
+            // RAG: Vector semantic search
+            products = await semanticSearchProducts(lastUserMsg.content, 8, 0.55);
+          } else {
+            // Fallback: Text-based search (still useful without embeddings)
+            products = await textFallback(lastUserMsg.content);
+          }
+        } catch (err) {
+          console.error('Product search failed, continuing without products:', err);
+        }
+      }
+    }
+
+    // ─── RAG Step 2: Build context-aware system prompt ───────
+    const systemPrompt = buildSystemPrompt(products);
+
     const groqMessages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...messages.map((msg: { role: string; content: string }) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
+      { role: 'system', content: systemPrompt },
+      ...recentMessages,
     ];
 
-    // Call Groq API with streaming
+    // ─── RAG Step 3: Stream AI response ──────────────────────
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
@@ -161,7 +168,7 @@ export async function POST(request: NextRequest) {
         model: GROQ_MODEL,
         messages: groqMessages,
         stream: true,
-        temperature: 0.7,
+        temperature: 0.6,
         max_tokens: 1024,
       }),
     });
@@ -171,14 +178,23 @@ export async function POST(request: NextRequest) {
       console.error('Groq API error:', response.status, errorText);
       return NextResponse.json(
         { error: 'Lỗi kết nối AI. Vui lòng thử lại.' },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
-    // Stream the response, then search for products at the end
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        // Send products immediately if found (before AI starts responding)
+        if (products.length > 0) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ searchingProducts: true })}\n\n`),
+          );
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ products })}\n\n`),
+          );
+        }
+
         const reader = response.body?.getReader();
         if (!reader) {
           controller.close();
@@ -186,7 +202,6 @@ export async function POST(request: NextRequest) {
         }
 
         const decoder = new TextDecoder();
-        let fullContent = '';
 
         try {
           while (true) {
@@ -200,20 +215,16 @@ export async function POST(request: NextRequest) {
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
                 if (data === '[DONE]') {
+                  controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                   continue;
                 }
                 try {
                   const parsed = JSON.parse(data);
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
-                    fullContent += content;
-                    // Stream each token to client (remove [SEARCH_PRODUCTS:...] in real-time)
-                    const cleanContent = content.replace(/\[SEARCH_PRODUCTS:.*?\]/gi, '');
-                    if (cleanContent) {
-                      controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ content: cleanContent })}\n\n`)
-                      );
-                    }
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
+                    );
                   }
                 } catch {
                   // Skip malformed JSON
@@ -221,32 +232,6 @@ export async function POST(request: NextRequest) {
               }
             }
           }
-
-          // After streaming is done, extract keywords and search products
-          const { keywords } = extractSearchKeywords(fullContent);
-
-          if (keywords.length > 0) {
-            // Signal client that product search is starting
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ searchingProducts: true })}\n\n`)
-            );
-
-            const products = await searchProducts(keywords);
-            if (products.length > 0) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ products })}\n\n`
-                )
-              );
-            } else {
-              // Signal: no products found
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ searchingProducts: false, noResults: true })}\n\n`)
-              );
-            }
-          }
-
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         } catch (error) {
           console.error('Stream error:', error);
         } finally {
@@ -266,7 +251,7 @@ export async function POST(request: NextRequest) {
     console.error('Chat API error:', error);
     return NextResponse.json(
       { error: 'Có lỗi xảy ra. Vui lòng thử lại.' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

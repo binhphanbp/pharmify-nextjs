@@ -11,6 +11,7 @@ export interface ChatProduct {
   short_description: string;
   requires_prescription: boolean;
   category_name?: string;
+  similarity?: number; // RAG relevance score (0-1)
 }
 
 export interface ChatMessage {

@@ -9,14 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.52",
     "@reduxjs/toolkit": "^2.11.2",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.1",
+    "ai": "^6.0.158",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "formik": "^2.4.9",
     "jose": "^6.2.2",
     "next": "16.2.1",
+    "openai": "^6.34.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-redux": "^9.2.0",
