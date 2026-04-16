@@ -7,7 +7,13 @@ import { addCartItem } from '@/stores/cart-store';
 import type { ChatMessage, ChatProduct } from '@/types/chat';
 
 /* ─── Add-to-Cart Toast ───────────────────────────────── */
-function CartToast({ productName, onClose }: { productName: string; onClose: () => void }) {
+function CartToast({
+  productName,
+  onClose,
+}: {
+  productName: string;
+  onClose: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onClose, 2800);
     return () => clearTimeout(t);
@@ -16,7 +22,9 @@ function CartToast({ productName, onClose }: { productName: string; onClose: () 
   return (
     <div className="cb-cart-toast">
       <span className="material-icons">check_circle</span>
-      <span>Đã thêm <strong>{productName}</strong> vào giỏ!</span>
+      <span>
+        Đã thêm <strong>{productName}</strong> vào giỏ!
+      </span>
     </div>
   );
 }
@@ -33,7 +41,7 @@ function ChatProductCard({
     product.original_price && product.original_price > product.price
       ? Math.round(
           ((product.original_price - product.price) / product.original_price) *
-            100
+            100,
         )
       : 0;
 
@@ -200,16 +208,10 @@ function renderFormattedText(text: string) {
 
   return lines.map((line, i) => {
     // Bold text: **text**
-    let formatted = line.replace(
-      /\*\*(.*?)\*\*/g,
-      '<strong>$1</strong>'
-    );
+    let formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
     // Inline code: `text`
-    formatted = formatted.replace(
-      /`(.*?)`/g,
-      '<code>$1</code>'
-    );
+    formatted = formatted.replace(/`(.*?)`/g, '<code>$1</code>');
 
     // Emoji bullets
     if (/^[•\-\*]\s/.test(formatted)) {
@@ -239,7 +241,11 @@ function renderFormattedText(text: string) {
     }
 
     return (
-      <p key={i} className="cb-paragraph" dangerouslySetInnerHTML={{ __html: formatted }} />
+      <p
+        key={i}
+        className="cb-paragraph"
+        dangerouslySetInnerHTML={{ __html: formatted }}
+      />
     );
   });
 }
@@ -282,10 +288,17 @@ export default function ChatBot() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed.map((m: ChatMessage) => ({ ...m, searchingProducts: false })));
+          setMessages(
+            parsed.map((m: ChatMessage) => ({
+              ...m,
+              searchingProducts: false,
+            })),
+          );
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // Save to session
@@ -306,17 +319,20 @@ export default function ChatBot() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleAddToCart = useCallback((product: ChatProduct) => {
-    if (!product.base_unit_id) return;
-    dispatch(
-      addCartItem({
-        productId: product.id,
-        unitId: product.base_unit_id,
-        quantity: 1,
-      })
-    );
-    setCartToast(product.name);
-  }, [dispatch]);
+  const handleAddToCart = useCallback(
+    (product: ChatProduct) => {
+      if (!product.base_unit_id) return;
+      dispatch(
+        addCartItem({
+          productId: product.id,
+          unitId: product.base_unit_id,
+          quantity: 1,
+        }),
+      );
+      setCartToast(product.name);
+    },
+    [dispatch],
+  );
 
   const sendMessage = async (overrideText?: string) => {
     const trimmed = (overrideText || input).trim();
@@ -391,8 +407,8 @@ export default function ChatBot() {
                   prev.map((m) =>
                     m.id === assistantMessage.id
                       ? { ...m, searchingProducts: parsed.searchingProducts }
-                      : m
-                  )
+                      : m,
+                  ),
                 );
                 continue;
               }
@@ -402,9 +418,13 @@ export default function ChatBot() {
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessage.id
-                      ? { ...m, products: parsed.products, searchingProducts: false }
-                      : m
-                  )
+                      ? {
+                          ...m,
+                          products: parsed.products,
+                          searchingProducts: false,
+                        }
+                      : m,
+                  ),
                 );
                 continue;
               }
@@ -415,8 +435,8 @@ export default function ChatBot() {
                   prev.map((m) =>
                     m.id === assistantMessage.id
                       ? { ...m, searchingProducts: false }
-                      : m
-                  )
+                      : m,
+                  ),
                 );
                 continue;
               }
@@ -429,18 +449,21 @@ export default function ChatBot() {
                   prev.map((m) =>
                     m.id === assistantMessage.id
                       ? { ...m, content: currentText }
-                      : m
-                  )
+                      : m,
+                  ),
                 );
               }
-            } catch { /* skip */ }
+            } catch {
+              /* skip */
+            }
           }
         }
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Chat error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Có lỗi xảy ra';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Có lỗi xảy ra';
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessage.id
@@ -448,8 +471,8 @@ export default function ChatBot() {
                 ...m,
                 content: `❌ ${errorMessage === 'Chat API failed' ? 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.' : errorMessage}`,
               }
-            : m
-        )
+            : m,
+        ),
       );
     } finally {
       setIsLoading(false);
@@ -488,7 +511,9 @@ export default function ChatBot() {
   ];
 
   // Check if last assistant message has products (for showing quick replies)
-  const lastAssistantMsg = [...messages].reverse().find((m) => m.role === 'assistant');
+  const lastAssistantMsg = [...messages]
+    .reverse()
+    .find((m) => m.role === 'assistant');
   const showQuickReplies =
     !isLoading &&
     lastAssistantMsg?.products &&
@@ -499,10 +524,7 @@ export default function ChatBot() {
     <>
       {/* Cart Toast */}
       {cartToast && (
-        <CartToast
-          productName={cartToast}
-          onClose={() => setCartToast(null)}
-        />
+        <CartToast productName={cartToast} onClose={() => setCartToast(null)} />
       )}
 
       {/* Floating Toggle Button */}
@@ -519,7 +541,9 @@ export default function ChatBot() {
         ) : (
           <>
             <span className="material-icons">medication</span>
-            {showPulse && <span className="cb-toggle-label">Hỏi Dược Sĩ AI</span>}
+            {showPulse && (
+              <span className="cb-toggle-label">Hỏi Dược Sĩ AI</span>
+            )}
           </>
         )}
       </button>
@@ -560,8 +584,9 @@ export default function ChatBot() {
               </div>
               <h4>Xin chào! 👋</h4>
               <p>
-                Tôi là <strong>Dược Sĩ AI</strong> của Pharmify. Tôi có thể tư vấn thuốc,
-                tìm sản phẩm phù hợp và <strong>thêm ngay vào giỏ hàng</strong> cho bạn.
+                Tôi là <strong>Dược Sĩ AI</strong> của Pharmify. Tôi có thể tư
+                vấn thuốc, tìm sản phẩm phù hợp và{' '}
+                <strong>thêm ngay vào giỏ hàng</strong> cho bạn.
               </p>
               <div className="cb-welcome-features">
                 <div className="cb-feature">
@@ -610,7 +635,9 @@ export default function ChatBot() {
                     </div>
                   ) : (
                     <div className="cb-typing">
-                      <span /><span /><span />
+                      <span />
+                      <span />
+                      <span />
                     </div>
                   )}
                 </div>
@@ -621,12 +648,14 @@ export default function ChatBot() {
                 )}
 
                 {/* Product Cards */}
-                {msg.role === 'assistant' && msg.products && msg.products.length > 0 && (
-                  <ProductCarousel
-                    products={msg.products}
-                    onAddToCart={handleAddToCart}
-                  />
-                )}
+                {msg.role === 'assistant' &&
+                  msg.products &&
+                  msg.products.length > 0 && (
+                    <ProductCarousel
+                      products={msg.products}
+                      onAddToCart={handleAddToCart}
+                    />
+                  )}
               </div>
             </div>
           ))}

@@ -165,7 +165,11 @@ export default function AdminProductsPage() {
     if (editing) {
       await supabase.from('products').update(payload).eq('id', editing.id);
     } else {
-      const { data: inserted } = await supabase.from('products').insert(payload).select('id').single();
+      const { data: inserted } = await supabase
+        .from('products')
+        .insert(payload)
+        .select('id')
+        .single();
       if (inserted) productId = inserted.id;
     }
 
@@ -178,7 +182,9 @@ export default function AdminProductsPage() {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
         },
         body: JSON.stringify({ action: 'generate-one', productId }),
-      }).catch(() => { /* embedding generation is non-blocking */ });
+      }).catch(() => {
+        /* embedding generation is non-blocking */
+      });
     }
 
     setShowModal(false);
@@ -315,9 +321,7 @@ export default function AdminProductsPage() {
                           onClick={() => setDeleteId(p.id)}
                           className="btn-icon danger"
                         >
-                          <span className="material-icons text-lg">
-                            delete
-                          </span>
+                          <span className="material-icons text-lg">delete</span>
                         </button>
                       </div>
                     </td>
@@ -373,9 +377,7 @@ export default function AdminProductsPage() {
               <input
                 type="text"
                 value={form.sku}
-                onChange={(e) =>
-                  setForm({ ...form, sku: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
               />
             </div>
           </div>
@@ -385,9 +387,7 @@ export default function AdminProductsPage() {
               <input
                 type="text"
                 value={form.slug}
-                onChange={(e) =>
-                  setForm({ ...form, slug: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, slug: e.target.value })}
               />
             </div>
             <div className="form-group">
@@ -443,9 +443,7 @@ export default function AdminProductsPage() {
               <input
                 type="text"
                 value={form.origin}
-                onChange={(e) =>
-                  setForm({ ...form, origin: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, origin: e.target.value })}
               />
             </div>
           </div>
@@ -457,11 +455,7 @@ export default function AdminProductsPage() {
               onChange={(e) => setImageFile(e.target.files?.[0] || null)}
             />
             {form.image_url && (
-              <img
-                src={form.image_url}
-                className="preview-img"
-                alt="preview"
-              />
+              <img src={form.image_url} className="preview-img" alt="preview" />
             )}
           </div>
           <div className="flex gap-4 mt-2">
@@ -525,9 +519,7 @@ export default function AdminProductsPage() {
                     {formatCurrency(u.original_price)}
                   </td>
                   <td>
-                    {u.is_base_unit && (
-                      <span className="badge active">✓</span>
-                    )}
+                    {u.is_base_unit && <span className="badge active">✓</span>}
                   </td>
                 </tr>
               ))}

@@ -9,10 +9,15 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
+function mapProfileRoleToAuthRole(role: unknown): 'admin' | 'user' {
+  return role === 'admin' ? 'admin' : 'user';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, fullName } = body;
+    const { email, password, fullName, phone, role, isActive } = body;
+    const profileRole = role === 'admin' ? 'admin' : 'customer';
 
     // ─── VALIDATE ───────────────────────────────────────────────────
     if (!email || !password || !fullName) {
@@ -66,6 +71,10 @@ export async function POST(request: NextRequest) {
         password,
         email_confirm: true,
         user_metadata: { full_name: fullName },
+        app_metadata: {
+          role: mapProfileRoleToAuthRole(profileRole),
+          is_active: isActive !== undefined ? isActive : true,
+        },
       });
 
     if (authError || !authData.user) {
@@ -80,6 +89,9 @@ export async function POST(request: NextRequest) {
       id: authData.user.id,
       email,
       full_name: fullName,
+      phone: phone || null,
+      role: profileRole,
+      is_active: isActive !== undefined ? isActive : true,
       password_hash: hashedPassword,
     });
 

@@ -47,7 +47,10 @@ async function getBusinessSummary(supabase: SupabaseClient) {
       categories,
     ] = await Promise.all([
       supabase.from('products').select('id', { count: 'exact', head: true }),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true),
       supabase.from('categories').select('id', { count: 'exact', head: true }),
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       // Total order count (head only, no data transfer)
@@ -69,36 +72,42 @@ async function getBusinessSummary(supabase: SupabaseClient) {
 
     // Revenue from recent orders
     const recent30 = recentOrders.data || [];
-    const recent7 = recent30.filter((o) => new Date(o.created_at) >= sevenDaysAgo);
+    const recent7 = recent30.filter(
+      (o) => new Date(o.created_at) >= sevenDaysAgo,
+    );
     const revenue30 = recent30.reduce((s, o) => s + (o.total_amount || 0), 0);
     const revenue7 = recent7.reduce((s, o) => s + (o.total_amount || 0), 0);
 
     // Status breakdown from recent orders
     const statusBreakdown: Record<string, number> = {};
     recent30.forEach((o) => {
-      statusBreakdown[o.status || 'unknown'] = (statusBreakdown[o.status || 'unknown'] || 0) + 1;
+      statusBreakdown[o.status || 'unknown'] =
+        (statusBreakdown[o.status || 'unknown'] || 0) + 1;
     });
 
-  // Aggregate top products
-  const productSales: Record<string, { name: string; price: number; qty: number }> = {};
-  topSellingProducts.data?.forEach((item: any) => {
-    const id = item.product_id;
-    if (!productSales[id]) {
-      productSales[id] = {
-        name: item.products?.name || 'N/A',
-        price: item.products?.price || 0,
-        qty: 0,
-      };
-    }
-    productSales[id].qty += item.quantity || 1;
-  });
-  const topProducts = Object.values(productSales)
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 10);
+    // Aggregate top products
+    const productSales: Record<
+      string,
+      { name: string; price: number; qty: number }
+    > = {};
+    topSellingProducts.data?.forEach((item: any) => {
+      const id = item.product_id;
+      if (!productSales[id]) {
+        productSales[id] = {
+          name: item.products?.name || 'N/A',
+          price: item.products?.price || 0,
+          qty: 0,
+        };
+      }
+      productSales[id].qty += item.quantity || 1;
+    });
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 10);
 
-  const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
+    const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
-  return `
+    return `
 📊 DỮ LIỆU KINH DOANH PHARMIFY (realtime):
 
 🏪 Tổng quan:
@@ -108,7 +117,11 @@ async function getBusinessSummary(supabase: SupabaseClient) {
 - Người dùng: ${userCount.count || 0}
 
 📦 Đơn hàng 30 ngày gần đây (theo trạng thái):
-${Object.entries(statusBreakdown).map(([s, c]) => `- ${s}: ${c} đơn`).join('\n') || '- Chưa có dữ liệu'}
+${
+  Object.entries(statusBreakdown)
+    .map(([s, c]) => `- ${s}: ${c} đơn`)
+    .join('\n') || '- Chưa có dữ liệu'
+}
 
 📈 30 ngày gần đây: ${recent30.length} đơn — ${fmt(revenue30)}₫
 📈 7 ngày gần đây: ${recent7.length} đơn — ${fmt(revenue7)}₫
@@ -158,12 +171,21 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 },
+      );
     }
     const token = authHeader.slice(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
     if (authError || !user || user.app_metadata?.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 },
+      );
     }
 
     const apiKey = process.env.GROQ_API_KEY;
@@ -187,10 +209,12 @@ export async function POST(request: NextRequest) {
     const businessContext = await getBusinessSummary(supabase);
     const systemPrompt = `${SYSTEM_PROMPT_BASE}\n\n${businessContext}`;
 
-    const recentMessages = messages.slice(-12).map((msg: { role: string; content: string }) => ({
-      role: msg.role,
-      content: msg.content.slice(0, 3000),
-    }));
+    const recentMessages = messages
+      .slice(-12)
+      .map((msg: { role: string; content: string }) => ({
+        role: msg.role,
+        content: msg.content.slice(0, 3000),
+      }));
 
     const groqMessages = [
       { role: 'system', content: systemPrompt },
@@ -238,7 +262,9 @@ export async function POST(request: NextRequest) {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter((line) => line.trim() !== '');
+            const lines = chunk
+              .split('\n')
+              .filter((line) => line.trim() !== '');
 
             for (const line of lines) {
               if (line.startsWith('data: ')) {
@@ -252,7 +278,9 @@ export async function POST(request: NextRequest) {
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
                     controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
+                      encoder.encode(
+                        `data: ${JSON.stringify({ content })}\n\n`,
+                      ),
                     );
                   }
                 } catch {

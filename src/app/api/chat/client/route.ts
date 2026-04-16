@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { semanticSearchProducts, textSearchFallback as textFallback } from '@/lib/embedding';
+import {
+  semanticSearchProducts,
+  textSearchFallback as textFallback,
+} from '@/lib/embedding';
 import type { ChatProduct } from '@/types/chat';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -67,27 +70,89 @@ ${products
 }
 
 // ─── Detect if user message needs product search ─────────
-function shouldSearchProducts(messages: { role: string; content: string }[]): boolean {
+function shouldSearchProducts(
+  messages: { role: string; content: string }[],
+): boolean {
   const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
   if (!lastUserMsg) return false;
 
   const text = lastUserMsg.content.toLowerCase();
 
   // Greeting or very short generic messages — no search needed
-  const greetings = ['xin chào', 'hello', 'hi', 'chào', 'hey', 'cảm ơn', 'thank', 'ok', 'được', 'bye', 'tạm biệt'];
+  const greetings = [
+    'xin chào',
+    'hello',
+    'hi',
+    'chào',
+    'hey',
+    'cảm ơn',
+    'thank',
+    'ok',
+    'được',
+    'bye',
+    'tạm biệt',
+  ];
   if (greetings.some((g) => text.trim() === g)) return false;
 
   // Health/product-related keywords — definitely search
   const healthKeywords = [
-    'thuốc', 'đau', 'sốt', 'ho', 'cảm', 'viêm', 'dị ứng', 'vitamin',
-    'bổ sung', 'canxi', 'sắt', 'omega', 'kháng sinh', 'giảm đau',
-    'tiêu hóa', 'dạ dày', 'mắt', 'da', 'tóc', 'xương', 'khớp',
-    'huyết áp', 'tiểu đường', 'cholesterol', 'miễn dịch', 'giấc ngủ',
-    'mệt mỏi', 'stress', 'trẻ em', 'bà bầu', 'người già', 'sản phẩm',
-    'mua', 'giá', 'tìm', 'gợi ý', 'đề xuất', 'nên dùng', 'nên uống',
-    'chăm sóc', 'mỹ phẩm', 'kem', 'gel', 'dung dịch', 'băng', 'gạc',
-    'nhiệt kế', 'máy đo', 'khẩu trang', 'sát khuẩn', 'paracetamol',
-    'ibuprofen', 'aspirin', 'kẽm', 'DHA', 'probiotic', 'men vi sinh',
+    'thuốc',
+    'đau',
+    'sốt',
+    'ho',
+    'cảm',
+    'viêm',
+    'dị ứng',
+    'vitamin',
+    'bổ sung',
+    'canxi',
+    'sắt',
+    'omega',
+    'kháng sinh',
+    'giảm đau',
+    'tiêu hóa',
+    'dạ dày',
+    'mắt',
+    'da',
+    'tóc',
+    'xương',
+    'khớp',
+    'huyết áp',
+    'tiểu đường',
+    'cholesterol',
+    'miễn dịch',
+    'giấc ngủ',
+    'mệt mỏi',
+    'stress',
+    'trẻ em',
+    'bà bầu',
+    'người già',
+    'sản phẩm',
+    'mua',
+    'giá',
+    'tìm',
+    'gợi ý',
+    'đề xuất',
+    'nên dùng',
+    'nên uống',
+    'chăm sóc',
+    'mỹ phẩm',
+    'kem',
+    'gel',
+    'dung dịch',
+    'băng',
+    'gạc',
+    'nhiệt kế',
+    'máy đo',
+    'khẩu trang',
+    'sát khuẩn',
+    'paracetamol',
+    'ibuprofen',
+    'aspirin',
+    'kẽm',
+    'DHA',
+    'probiotic',
+    'men vi sinh',
   ];
 
   return healthKeywords.some((kw) => text.includes(kw)) || text.length > 15;
@@ -96,7 +161,10 @@ function shouldSearchProducts(messages: { role: string; content: string }[]): bo
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const ip =
+      request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
         { error: 'Bạn đã gửi quá nhiều tin nhắn. Vui lòng đợi 1 phút.' },
@@ -123,28 +191,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Limit message history to prevent abuse
-    const recentMessages = messages.slice(-10).map((msg: { role: string; content: string }) => ({
-      role: msg.role,
-      content: msg.content.slice(0, 2000), // Limit each message length
-    }));
+    const recentMessages = messages
+      .slice(-10)
+      .map((msg: { role: string; content: string }) => ({
+        role: msg.role,
+        content: msg.content.slice(0, 2000), // Limit each message length
+      }));
 
     // ─── RAG Step 1: Semantic search for relevant products ───
     let products: ChatProduct[] = [];
     const needsSearch = shouldSearchProducts(recentMessages);
 
     if (needsSearch) {
-      const lastUserMsg = [...recentMessages].reverse().find((m) => m.role === 'user');
+      const lastUserMsg = [...recentMessages]
+        .reverse()
+        .find((m) => m.role === 'user');
       if (lastUserMsg) {
         try {
           if (process.env.OPENAI_API_KEY) {
             // RAG: Vector semantic search
-            products = await semanticSearchProducts(lastUserMsg.content, 8, 0.55);
+            products = await semanticSearchProducts(
+              lastUserMsg.content,
+              8,
+              0.55,
+            );
           } else {
             // Fallback: Text-based search (still useful without embeddings)
             products = await textFallback(lastUserMsg.content);
           }
         } catch (err) {
-          console.error('Product search failed, continuing without products:', err);
+          console.error(
+            'Product search failed, continuing without products:',
+            err,
+          );
         }
       }
     }
@@ -188,7 +267,9 @@ export async function POST(request: NextRequest) {
         // Send products immediately if found (before AI starts responding)
         if (products.length > 0) {
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ searchingProducts: true })}\n\n`),
+            encoder.encode(
+              `data: ${JSON.stringify({ searchingProducts: true })}\n\n`,
+            ),
           );
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ products })}\n\n`),
@@ -209,7 +290,9 @@ export async function POST(request: NextRequest) {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter((line) => line.trim() !== '');
+            const lines = chunk
+              .split('\n')
+              .filter((line) => line.trim() !== '');
 
             for (const line of lines) {
               if (line.startsWith('data: ')) {
@@ -223,7 +306,9 @@ export async function POST(request: NextRequest) {
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
                     controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
+                      encoder.encode(
+                        `data: ${JSON.stringify({ content })}\n\n`,
+                      ),
                     );
                   }
                 } catch {

@@ -43,7 +43,9 @@ export default function AdminChatBot() {
     if (saved) {
       try {
         setMessages(JSON.parse(saved));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }, []);
 
@@ -53,103 +55,119 @@ export default function AdminChatBot() {
     }
   }, [messages]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isStreaming) return;
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isStreaming) return;
 
-    const userMessage: ChatMessage = {
-      id: generateId(),
-      role: 'user',
-      content: text.trim(),
-      timestamp: Date.now(),
-    };
+      const userMessage: ChatMessage = {
+        id: generateId(),
+        role: 'user',
+        content: text.trim(),
+        timestamp: Date.now(),
+      };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsStreaming(true);
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+      setIsStreaming(true);
 
-    const assistantId = generateId();
-    setMessages((prev) => [
-      ...prev,
-      { id: assistantId, role: 'assistant', content: '', timestamp: Date.now() },
-    ]);
-
-    try {
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      const allMessages = [...messages, userMessage].map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      // Get auth token for admin verification
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const response = await fetch('/api/chat/admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const assistantId = generateId();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
         },
-        body: JSON.stringify({ messages: allMessages }),
-        signal: controller.signal,
-      });
+      ]);
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Lỗi kết nối');
-      }
+      try {
+        const controller = new AbortController();
+        abortRef.current = controller;
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader');
+        const allMessages = [...messages, userMessage].map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-      const decoder = new TextDecoder();
-      let fullContent = '';
-      let sseBuffer = '';
+        // Get auth token for admin verification
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const token = session?.access_token;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const response = await fetch('/api/chat/admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ messages: allMessages }),
+          signal: controller.signal,
+        });
 
-        sseBuffer += decoder.decode(value, { stream: true });
-        const parts = sseBuffer.split('\n');
-        sseBuffer = parts.pop() || '';
-        const lines = parts.filter((l) => l.trim());
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Lỗi kết nối');
+        }
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                fullContent += parsed.content;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId ? { ...m, content: fullContent } : m
-                  )
-                );
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('No reader');
+
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let sseBuffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+          const parts = sseBuffer.split('\n');
+          sseBuffer = parts.pop() || '';
+          const lines = parts.filter((l) => l.trim());
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  fullContent += parsed.content;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantId ? { ...m, content: fullContent } : m,
+                    ),
+                  );
+                }
+              } catch {
+                /* skip */
               }
-            } catch { /* skip */ }
+            }
           }
         }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content:
+                    '❌ Có lỗi xảy ra. Vui lòng kiểm tra API key và thử lại.',
+                }
+              : m,
+          ),
+        );
+      } finally {
+        setIsStreaming(false);
+        abortRef.current = null;
       }
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === 'AbortError') return;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: '❌ Có lỗi xảy ra. Vui lòng kiểm tra API key và thử lại.' }
-            : m
-        )
-      );
-    } finally {
-      setIsStreaming(false);
-      abortRef.current = null;
-    }
-  }, [isStreaming, messages]);
+    },
+    [isStreaming, messages],
+  );
 
   const handleNewChat = () => {
     if (abortRef.current) abortRef.current.abort();
@@ -172,7 +190,14 @@ export default function AdminChatBot() {
   };
 
   const renderContent = (content: string) => {
-    if (!content) return <span className="admin-chat-typing"><span /><span /><span /></span>;
+    if (!content)
+      return (
+        <span className="admin-chat-typing">
+          <span />
+          <span />
+          <span />
+        </span>
+      );
 
     return content.split('\n').map((line, i) => {
       let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -196,7 +221,13 @@ export default function AdminChatBot() {
 
       if (line.startsWith('#')) {
         const text = line.replace(/^#+\s*/, '');
-        return <div key={i} className="admin-chat-heading" dangerouslySetInnerHTML={{ __html: text }} />;
+        return (
+          <div
+            key={i}
+            className="admin-chat-heading"
+            dangerouslySetInnerHTML={{ __html: text }}
+          />
+        );
       }
 
       return line.trim() ? (
@@ -221,7 +252,9 @@ export default function AdminChatBot() {
       </button>
 
       {/* Chat Panel */}
-      <div className={`admin-chat-panel ${isOpen ? 'admin-chat-panel-open' : ''}`}>
+      <div
+        className={`admin-chat-panel ${isOpen ? 'admin-chat-panel-open' : ''}`}
+      >
         {/* Header */}
         <div className="admin-chat-header">
           <div className="admin-chat-header-info">
@@ -230,14 +263,24 @@ export default function AdminChatBot() {
             </div>
             <div>
               <h3 className="admin-chat-title">Trợ Lý AI Phân Tích</h3>
-              <span className="admin-chat-subtitle">Dữ liệu realtime từ Pharmify</span>
+              <span className="admin-chat-subtitle">
+                Dữ liệu realtime từ Pharmify
+              </span>
             </div>
           </div>
           <div className="admin-chat-header-actions">
-            <button onClick={handleNewChat} title="Phiên mới" className="admin-chat-hdr-btn">
+            <button
+              onClick={handleNewChat}
+              title="Phiên mới"
+              className="admin-chat-hdr-btn"
+            >
               <span className="material-icons">delete_sweep</span>
             </button>
-            <button onClick={() => setIsOpen(false)} title="Đóng" className="admin-chat-hdr-btn">
+            <button
+              onClick={() => setIsOpen(false)}
+              title="Đóng"
+              className="admin-chat-hdr-btn"
+            >
               <span className="material-icons">close</span>
             </button>
           </div>

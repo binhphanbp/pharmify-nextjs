@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 import {
@@ -31,6 +31,8 @@ export default function AdminUsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
+    email: '',
+    password: '',
     full_name: '',
     phone: '',
     role: 'customer',
@@ -50,11 +52,7 @@ export default function AdminUsersPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
@@ -67,11 +65,30 @@ export default function AdminUsersPage() {
       setUsers(data || []);
     }
     setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm({
+      email: '',
+      password: '',
+      full_name: '',
+      phone: '',
+      role: 'customer',
+      is_active: true,
+    });
+    setShowModal(true);
   };
 
   const openEdit = (user: UserRow) => {
     setEditing(user);
     setForm({
+      email: user.email,
+      password: '',
       full_name: user.full_name || '',
       phone: user.phone || '',
       role: user.role,
@@ -82,20 +99,57 @@ export default function AdminUsersPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editing) return;
     setSaving(true);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(form)
-      .eq('id', editing.id);
+    const updatePayload = {
+      full_name: form.full_name,
+      phone: form.phone,
+      role: form.role,
+      is_active: form.is_active,
+    };
 
-    if (error) {
-      setToast({ message: 'Lưu thất bại: ' + error.message, type: 'error' });
+    if (editing) {
+      try {
+        const res = await fetch(`/api/admin/users/${editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Lỗi cập nhật người dùng');
+
+        setToast({ message: 'Cập nhật thành công!', type: 'success' });
+        setShowModal(false);
+        loadUsers();
+      } catch (err: unknown) {
+        setToast({
+          message: 'Lưu thất bại: ' + (err as Error).message,
+          type: 'error',
+        });
+      }
     } else {
-      setToast({ message: 'Cập nhật thành công!', type: 'success' });
-      setShowModal(false);
-      loadUsers();
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+            fullName: form.full_name,
+            phone: form.phone,
+            role: form.role,
+            isActive: form.is_active,
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Lỗi thêm người dùng');
+
+        setToast({ message: 'Thêm mới thành công!', type: 'success' });
+        setShowModal(false);
+        loadUsers();
+      } catch (err: unknown) {
+        setToast({ message: (err as Error).message, type: 'error' });
+      }
     }
     setSaving(false);
   };
@@ -103,17 +157,23 @@ export default function AdminUsersPage() {
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', deleteId);
 
-    if (error) {
-      setToast({ message: 'Xóa thất bại: ' + error.message, type: 'error' });
-    } else {
+    try {
+      const res = await fetch(`/api/admin/users/${deleteId}`, {
+        method: 'DELETE',
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Lỗi khi xóa người dùng');
+
       setToast({ message: 'Đã xóa người dùng', type: 'success' });
       loadUsers();
+    } catch (err: unknown) {
+      setToast({
+        message: 'Xóa thất bại: ' + (err as Error).message,
+        type: 'error',
+      });
     }
+
     setDeleteId(null);
     setDeleting(false);
   };
@@ -151,7 +211,11 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      <PageHeader title="Quản lý người dùng" />
+      <PageHeader
+        title="Quản lý người dùng"
+        actionText="Thêm người dùng"
+        onAction={openAdd}
+      />
 
       {/* Filters */}
       <div className="filter-bar">
@@ -245,14 +309,33 @@ export default function AdminUsersPage() {
       <AdminModal
         show={showModal}
         onClose={() => setShowModal(false)}
-        title="Chỉnh sửa người dùng"
+        title={editing ? 'Chỉnh sửa người dùng' : 'Thêm người dùng'}
       >
         <form onSubmit={handleSave}>
           <div className="modal-body">
             <div className="form-group">
               <label>Email</label>
-              <input type="text" value={editing?.email || ''} disabled />
+              <input
+                type="email"
+                value={form.email}
+                disabled={!!editing}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+              />
             </div>
+            {!editing && (
+              <div className="form-group">
+                <label>Mật khẩu</label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
+                  required={!editing}
+                />
+              </div>
+            )}
             <div className="form-group">
               <label>Họ tên</label>
               <input
@@ -261,6 +344,7 @@ export default function AdminUsersPage() {
                 onChange={(e) =>
                   setForm({ ...form, full_name: e.target.value })
                 }
+                required
               />
             </div>
             <div className="form-group">

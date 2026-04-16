@@ -39,8 +39,7 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  // Refresh session token nếu sắp hết hạn — lấy luôn user từ đây
-  // Wrap trong try-catch để không crash middleware nếu Supabase không respond
+  // Refresh session token nếu sắp hết hạn
   let sessionUser = null;
   try {
     const {
@@ -49,7 +48,6 @@ export async function updateSession(request: NextRequest) {
     sessionUser = user;
   } catch (err) {
     console.error('[Middleware] Failed to get user session:', err);
-    // Không crash — tiếp tục xử lý, protected routes sẽ redirect
   }
 
   // ─────────────────────────────────────────────────────
@@ -67,7 +65,7 @@ export async function updateSession(request: NextRequest) {
       return redirectToAuth(request, pathname);
     }
 
-    // Kiểm tra role admin — dùng app_metadata từ Supabase session
+    // Kiểm tra role admin, dùng app_metadata từ Supabase session
     if (pathname.startsWith('/admin')) {
       const isAdmin = sessionUser.app_metadata?.role === 'admin';
       if (!isAdmin) {
@@ -81,7 +79,7 @@ export async function updateSession(request: NextRequest) {
   return supabaseResponse;
 }
 
-// Helper: redirect về trang auth
+// redirect về trang auth
 function redirectToAuth(request: NextRequest, pathname: string) {
   const url = request.nextUrl.clone();
   url.pathname = '/auth';
